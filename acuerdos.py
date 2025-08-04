@@ -80,6 +80,10 @@ def cargar_datos(sheet_name):
     data = worksheet.get_all_records()
     return pd.DataFrame(data)
 
+if st.button("🔄 Actualizar datos"):
+    st.cache_data.clear()  # Limpia toda la caché de datos
+
+
 # Navegación principal sin sidebar
 seccion = st.selectbox("🌿 Explorar secciones", [
     "",
