@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 from google.oauth2.service_account import Credentials
+import datetime
 
 # Configuración inicial de la app
 st.set_page_config(page_title="Acuerdos Aucca", layout="wide")
@@ -57,15 +57,8 @@ Nace de nuestra intención de construir un mejor día a día, reconociendo que e
 en lo cotidiano: en el cuidado del espacio, de las relaciones, de las confianzas y de los acuerdos.
 """)
 
-# Conexión a Google Sheets desde credenciales
-@st.cache_data
+# Función para cargar datos desde Google Sheets
 def cargar_datos(sheet_name):
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    
-
     creds = Credentials.from_service_account_info(
         st.secrets["gspread"],
         scopes=[
@@ -74,15 +67,10 @@ def cargar_datos(sheet_name):
         ]
     )
     client = gspread.authorize(creds)
-    client = gspread.authorize(creds)
     sh = client.open_by_key("1C8njkp0RQMdXnxuJvPvfK_pNZHQSi7q7dUPeUg-2624")
     worksheet = sh.worksheet(sheet_name)
     data = worksheet.get_all_records()
     return pd.DataFrame(data)
-
-if st.button("🔄 Actualizar datos"):
-    st.cache_data.clear()  # Limpia toda la caché de datos
-
 
 # Navegación principal sin sidebar
 seccion = st.selectbox("🌿 Explorar secciones", [
@@ -90,7 +78,8 @@ seccion = st.selectbox("🌿 Explorar secciones", [
     "Tareas por zona (semanerxs)",
     "Acuerdos de convivencia (internos)",
     "Acuerdos Comunicación Externa",
-    "Videos y recursos"
+    "Videos y recursos",
+    "✅ Checklist de semanero"
 ])
 
 if seccion == "":
@@ -118,12 +107,15 @@ elif seccion == "Tareas por zona (semanerxs)":
         "Tarea": "Detalle de lo que debe realizarse"
     })
     temas = df['Área de responsabilidad semanal'].unique()
-    tema = st.selectbox("🌱 Selecciona un área de responsabilidad semanal:", temas)
-    subset = df[df['Área de responsabilidad semanal'] == tema]
+    tema = st.selectbox("🌱 Selecciona un área de responsabilidad semanal:", [""] + list(temas))
+    if tema:
+        subset = df[df['Área de responsabilidad semanal'] == tema]
+        for _, row in subset.iterrows():
+            st.markdown(f"#### {row['Elemento o espacio específico']}")
+            st.markdown(f"{row['Detalle de lo que debe realizarse']}")
     for _, row in subset.iterrows():
         st.markdown(f"#### {row['Elemento o espacio específico']}")
         st.markdown(f"{row['Detalle de lo que debe realizarse']}")
-        #st.markdown("---")
 
 elif seccion == "Acuerdos de convivencia (internos)":
     df = cargar_datos("acuerdos_internos")
@@ -138,11 +130,14 @@ elif seccion == "Acuerdos de convivencia (internos)":
     if ver_todo:
         for tema in temas:
             st.subheader(f"🟢 {tema}")
-            subset = df[df['Tema'] == tema].sort_values("Número de orden")
+            if tema:
+                subset = df[df['Tema'] == tema].sort_values("Número de orden")
+            for _, row in subset.iterrows():
+                st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
             for _, row in subset.iterrows():
                 st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
     else:
-        tema = st.selectbox("🪴 Selecciona un tema:", temas)
+        tema = st.selectbox("🪴 Selecciona un tema:", [""] + list(temas))
         subset = df[df['Tema'] == tema].sort_values("Número de orden")
         for _, row in subset.iterrows():
             st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
@@ -155,14 +150,201 @@ elif seccion == "Acuerdos Comunicación Externa":
         "Detalle": "Detalle del acuerdo"
     })
     tipos = df['Tipo de acuerdo'].unique()
-    tipo = st.selectbox("🤝 Selecciona un tipo de acuerdo:", tipos)
-    subset = df[df['Tipo de acuerdo'] == tipo]
+    tipo = st.selectbox("🤝 Selecciona un tipo de acuerdo:", [""] + list(tipos))
+    if tipo:
+        subset = df[df['Tipo de acuerdo'] == tipo]
+        for _, row in subset.iterrows():
+            st.markdown(f"#### {row['Aspecto específico']}")
+            st.markdown(f"{row['Detalle del acuerdo']}")
     for _, row in subset.iterrows():
         st.markdown(f"#### {row['Aspecto específico']}")
         st.markdown(f"{row['Detalle del acuerdo']}")
-        #st.markdown("---")
 
 elif seccion == "Videos y recursos":
     st.subheader("🔌 Funcionamiento de la electricidad en AUCCA")
     st.video("luz_solar_chalo.mp4")
     st.markdown("Este video explica cómo funciona la electricidad solar en AUCCA. Pronto agregaremos nuevos videos para cada tema.")
+
+elif seccion == "✅ Checklist de semanero":
+    inicio_semana = datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())
+    fin_semana = inicio_semana + datetime.timedelta(days=6)
+    inicio_semana = datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())
+    fin_semana = inicio_semana + datetime.timedelta(days=6)
+
+    
+    inicio_semana = datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())
+    fin_semana = inicio_semana + datetime.timedelta(days=6)
+    rango_fecha = st.date_input(
+        "Selecciona el rango de fechas para visualizar registros:",
+        value=(inicio_semana, fin_semana)
+    )
+
+    
+    
+    fecha_inicio = datetime.datetime.combine(rango_fecha[0], datetime.datetime.min.time())
+    fecha_fin = datetime.datetime.combine(rango_fecha[1], datetime.datetime.max.time())
+    st.markdown(f"#### Hoy es {datetime.datetime.now().strftime('%A %d de %B de %Y, %H:%M')} 🗓️")
+    st.title("✅ Checklist de semanero")
+    st.caption("Revisa y marca las tareas que se han realizado durante la semana.")
+
+    semaneros = ["Chalo", "Camilú", "Niko", "Diego", "Francis", "Tais", "Cala"]
+    nombre = st.selectbox("Selecciona tu nombre:", [""] + semaneros)
+    df_tareas = cargar_datos("tareas_semaneros")
+
+
+    try:
+        df_estado = cargar_datos("estado_tareas")
+        if df_estado.empty:
+            df_estado = pd.DataFrame(columns=["Fecha", "Usuario", "Tema", "Zona", "Tarea", "Completada"])
+        else:
+            df_estado.columns = [col.strip() for col in df_estado.columns]
+    except:
+        df_estado = pd.DataFrame(columns=["Fecha", "Usuario", "Tema", "Zona", "Tarea", "Completada"])
+
+    hoy = datetime.datetime.now()
+    semana_actual = hoy.isocalendar()[1]
+    df_estado["Semana"] = pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M')\
+    .dt.isocalendar().week
+
+    tareas_realizadas = df_estado[df_estado["Semana"] == semana_actual]["Tarea"].tolist()
+    if nombre:
+        df_pendientes = df_tareas[~df_tareas["Tarea"].isin(tareas_realizadas)]
+    else:
+        df_pendientes = pd.DataFrame(columns=df_tareas.columns)
+
+    for tema in df_pendientes["Tema"].unique():
+        st.markdown(f"### 🌱 {tema}")
+        subtareas = df_pendientes[df_pendientes["Tema"] == tema]
+
+        for _, row in subtareas.iterrows():
+            tarea_id = f"{row['Zona']} - {row['Tarea']}"
+            completada = st.checkbox(
+                f"**{row['Zona']}**: {row['Tarea']}", key=tarea_id
+            )
+
+            if completada:
+                creds = Credentials.from_service_account_info(
+                    st.secrets["gspread"],
+                    scopes=[
+                        "https://spreadsheets.google.com/feeds",
+                        "https://www.googleapis.com/auth/drive"
+                    ]
+                )
+                client = gspread.authorize(creds)
+                sh = client.open_by_key("1C8njkp0RQMdXnxuJvPvfK_pNZHQSi7q7dUPeUg-2624")
+                worksheet = sh.worksheet("estado_tareas")
+                worksheet.append_row([hoy.strftime("%Y-%m-%d %H:%M"), nombre, row["Tema"], row["Zona"], row["Tarea"], "Sí"])
+                st.success(f"✅ Tarea registrada: {row['Zona']} - {row['Tarea']}")
+
+    # Mostrar resumen por tema
+    st.markdown("---")
+    st.subheader("📊 Resumen de tareas completadas por tema (esta semana)")
+
+    # Calcular resumen antes de usarlo
+    completadas = df_estado[(pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) & (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)]
+    resumen_tema = completadas.groupby("Tema")["Tarea"].count()
+    total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
+    resumen = pd.DataFrame({
+        "Completadas": resumen_tema,
+        "Total": total_por_tema
+    }).fillna(0).astype(int)
+    resumen["% completado"] = ((resumen["Completadas"] / resumen["Total"]) * 100).round(1).astype(str) + "%"
+
+# Mostrar selector ahora que resumen está definido
+    tema_seleccionado = st.selectbox("🔍 Selecciona un tema para ver detalles:", [""] + resumen.index.tolist())
+    if tema_seleccionado:
+        tareas_tema = df_tareas[df_tareas["Tema"] == tema_seleccionado]
+        completadas_tema = completadas[completadas["Tema"] == tema_seleccionado]
+
+        st.markdown("**✅ Tareas realizadas:**")
+        if 'completadas_tema' in locals():
+            st.dataframe(completadas_tema[["Fecha", "Usuario", "Zona", "Tarea"]].sort_values("Fecha", ascending=False))
+        else:
+            st.info("Selecciona un tema para ver tareas completadas y pendientes.")
+
+        realizadas = completadas_tema["Tarea"].unique().tolist()
+        pendientes_tema = tareas_tema[~tareas_tema["Tarea"].isin(realizadas)]
+
+        st.markdown("**⬜ Tareas pendientes:**")
+        st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
+
+        st.markdown("**⬜ Tareas pendientes:**")
+        st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
+
+    # Gráfico de barras interactivo
+    import plotly.express as px
+    completadas = df_estado[(pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) & (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)]
+    resumen_tema = completadas.groupby("Tema")["Tarea"].count()
+    total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
+    resumen = pd.DataFrame({
+        "Completadas": resumen_tema,
+        "Total": total_por_tema
+    }).fillna(0).astype(int)
+    resumen["% completado"] = ((resumen["Completadas"] / resumen["Total"]) * 100).round(1).astype(str) + "%"
+
+    chart_data = resumen.reset_index()
+    fig = px.bar(
+        chart_data,
+        x="Tema",
+        y="% completado",
+        text=resumen["% completado"].astype(str) + "%",
+        color_discrete_sequence=["#4C9A2A"],
+        hover_data={"Total": True, "% completado": True, "Completadas": True},
+        labels={"% completado": "% Completado"},
+        title="Porcentaje de tareas completadas por tema"
+    )
+    fig.update_traces(textposition='outside')
+    fig.update_layout(yaxis_range=[0, 100])
+    st.plotly_chart(fig, use_container_width=True)
+
+    with st.expander("🕒 Ver registros detallados por aucane"):
+        aucane = st.selectbox("Selecciona una persona:", [""] + sorted(completadas["Usuario"].unique().tolist()))
+        if aucane:
+            registros_aucane = completadas[completadas["Usuario"] == aucane].sort_values("Fecha", ascending=False)
+            total_tareas = len(df_tareas)
+            completadas_aucane = len(registros_aucane)
+            porcentaje = round((completadas_aucane / total_tareas) * 100, 1) if total_tareas > 0 else 0
+            st.markdown(f"**{aucane} completó {completadas_aucane} de {total_tareas} tareas esta semana ({porcentaje}%)**")
+            if not registros_aucane.empty:
+                resumen_aucane = registros_aucane.groupby("Tema")["Tarea"].count()
+                resumen_aucane = resumen_aucane.reset_index().rename(columns={"Tarea": "Tareas completadas"})
+                st.dataframe(registros_aucane[["Fecha", "Tema", "Zona", "Tarea"]])
+                st.markdown("**Temas en los que más ha contribuido:**")
+                st.dataframe(resumen_aucane.sort_values("Tareas completadas", ascending=False))
+
+                fig_aucane = px.pie(
+                    resumen_aucane,
+                    names="Tema",
+                    values="Tareas completadas",
+                    title=f"Distribución de aportes de {aucane} por tema",
+                    color_discrete_sequence=["#4C9A2A"]
+                )
+                st.plotly_chart(fig_aucane, use_container_width=True, key=f"plot_{aucane}")
+            else:
+                st.info("Esta persona no ha completado tareas en el rango de fechas seleccionado.")
+            resumen_aucane = resumen_aucane.reset_index().rename(columns={"Tarea": "Tareas completadas"})
+            st.dataframe(registros_aucane[["Fecha", "Tema", "Zona", "Tarea"]])
+            st.markdown("**Temas en los que más ha contribuido:**")
+            st.dataframe(resumen_aucane.sort_values("Tareas completadas", ascending=False))
+
+            fig_aucane = px.pie(
+                resumen_aucane,
+                names="Tema",
+                values="Tareas completadas",
+                title=f"Distribución de aportes de {aucane} por tema",
+                color_discrete_sequence=["#4C9A2A"]
+            )
+            st.plotly_chart(fig_aucane, use_container_width=True)
+            st.dataframe(completadas[["Fecha", "Usuario", "Tema", "Zona", "Tarea"]].sort_values("Fecha", ascending=False))
+
+            completadas = df_estado[df_estado["Semana"] == semana_actual]
+            resumen_tema = completadas.groupby("Tema")["Tarea"].count()
+            total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
+            resumen = pd.DataFrame({
+                "Completadas": resumen_tema,
+                "Total": total_por_tema
+            }).fillna(0).astype(int)
+            resumen["% completado"] = (resumen["Completadas"] / resumen["Total"] * 100).round(1)
+
+            st.dataframe(resumen)
+            st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
