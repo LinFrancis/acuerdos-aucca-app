@@ -93,15 +93,16 @@ if seccion == "":
         st.image("images/queltehue.png", width=70)
     with colq2:
         st.markdown("""
-        ### ¿Qué encontrarás aquí?
+        #### ¿Qué encontrarás aquí?
         Esta aplicación contiene acuerdos y tareas organizadas por temas, zonas y tipo de convivencia.
 
         - **Tareas por zona (semanerxs)**: responsabilidades de limpieza y mantenimiento profundo.
         - **Acuerdos de convivencia (internos)**: lo que hemos decidido como comunidad para convivir mejor.
         - **Acuerdos de comunicación externa**: cómo nos relacionamos con organizaciones, visitas y talleres.
         - **Videos y recursos**: materiales visuales de apoyo.
+        - **Check List semanerxs **: sistema de registro de avances en actividades de semanerxs. 
 
-        Usa los menús desplegables para explorar cada sección. 🌱
+        Usa los menús desplegables arriba para explorar cada sección. 🌱
         """)
 
 elif seccion == "Tareas por zona (semanerxs)":
@@ -459,6 +460,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
