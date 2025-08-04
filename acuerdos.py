@@ -320,9 +320,9 @@ elif seccion == "✅ Checklist de semanero":
             else:
                 st.info("Esta persona no ha completado tareas en el rango de fechas seleccionado.")
             resumen_aucane = resumen_aucane.reset_index().rename(columns={"Tarea": "Tareas completadas"})
-            st.dataframe(registros_aucane[["Fecha", "Tema", "Zona", "Tarea"]])
-            st.markdown("**Temas en los que más ha contribuido:**")
-            st.dataframe(resumen_aucane.sort_values("Tareas completadas", ascending=False))
+            # st.dataframe(registros_aucane[["Fecha", "Tema", "Zona", "Tarea"]])
+            # st.markdown("**Temas en los que más ha contribuido:**")
+            # st.dataframe(resumen_aucane.sort_values("Tareas completadas", ascending=False))
 
             # fig_aucane = px.pie(
             #     resumen_aucane,
@@ -345,4 +345,5 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
