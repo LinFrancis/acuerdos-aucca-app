@@ -356,28 +356,28 @@ elif seccion == "Checklist de semanerx":
         completadas_total = pd.concat([completadas_100, completadas_incompletas])
         completadas_total_tareas = completadas_total["Tarea"].unique().tolist()
         
-        # Gráfico de tareas completadas (100%)
-        resumen_tema_100 = completadas_100.groupby("Tema")["Tarea"].count()
-        total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
-        resumen_100 = pd.DataFrame({
-            "Completadas": resumen_tema_100,
-            "Total": total_por_tema
-        }).fillna(0).astype(int)
-        resumen_100["% completado"] = (resumen_100["Completadas"] / resumen_100["Total"] * 100).round(1)
-        
-        chart_data_100 = resumen_100.reset_index()
-        fig_100 = px.bar(
-            chart_data_100,
-            x="Tema",
-            y="% completado",
-            text=chart_data_100["% completado"].astype(str) + "%",
-            color_discrete_sequence=["#4C9A2A"],
-            hover_data={"Total": True, "% completado": True, "Completadas": True},
-            labels={"% completado": "% Completado"},
-            title="✅ Tareas completadas (100%) por tema"
-        )
-        fig_100.update_traces(textposition='outside')
-        fig_100.update_layout(yaxis_range=[0, 100])
+    # Gráfico de tareas completadas (100%)
+    resumen_tema_100 = completadas_100.groupby("Tema")["Tarea"].count()
+    total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
+    resumen_100 = pd.DataFrame({
+        "Completadas": resumen_tema_100,
+        "Total": total_por_tema
+    }).fillna(0).astype(int)
+    resumen_100["% completado"] = (resumen_100["Completadas"] / resumen_100["Total"] * 100).round(1)
+    
+    chart_data_100 = resumen_100.reset_index()
+    fig_100 = px.bar(
+        chart_data_100,
+        x="Tema",
+        y="% completado",
+        text=chart_data_100["% completado"].astype(str) + "%",
+        color_discrete_sequence=["#4C9A2A"],
+        hover_data={"Total": True, "% completado": True, "Completadas": True},
+        labels={"% completado": "% Completado"},
+        title="✅ Tareas completadas (100%) por tema"
+    )
+    fig_100.update_traces(textposition='outside')
+    fig_100.update_layout(yaxis_range=[0, 100])
     st.plotly_chart(fig_100, use_container_width=True)
         
         # Gráfico de tareas en proceso
@@ -466,6 +466,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
