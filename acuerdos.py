@@ -105,7 +105,7 @@ if seccion == "":
         Usa los menús desplegables arriba para explorar cada sección. 🌱
         """)
 
-elif seccion == "🔗 Links claves":
+elif seccion == "Links claves":
     df = cargar_datos("links")
     df = df.rename(columns={
         "Tema": "Tema",
@@ -498,6 +498,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
