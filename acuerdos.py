@@ -343,19 +343,19 @@ elif seccion == "Checklist de semanerx":
 
 
 
-        import plotly.express as px
-        # Convertir Porcentaje a número
-        completadas = df_estado[
-            (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) &
-            (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)
-        ]
-        completadas["Porcentaje"] = pd.to_numeric(completadas["Porcentaje"], errors="coerce").fillna(0).astype(int)
-        
-        completadas_100 = completadas[completadas["Porcentaje"] == 100]
-        completadas_incompletas = completadas[(completadas["Porcentaje"] > 0) & (completadas["Porcentaje"] < 100)]
-        completadas_total = pd.concat([completadas_100, completadas_incompletas])
-        completadas_total_tareas = completadas_total["Tarea"].unique().tolist()
-        
+    import plotly.express as px
+    # Convertir Porcentaje a número
+    completadas = df_estado[
+        (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) &
+        (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)
+    ]
+    completadas["Porcentaje"] = pd.to_numeric(completadas["Porcentaje"], errors="coerce").fillna(0).astype(int)
+    
+    completadas_100 = completadas[completadas["Porcentaje"] == 100]
+    completadas_incompletas = completadas[(completadas["Porcentaje"] > 0) & (completadas["Porcentaje"] < 100)]
+    completadas_total = pd.concat([completadas_100, completadas_incompletas])
+    completadas_total_tareas = completadas_total["Tarea"].unique().tolist()
+    
     # Gráfico de tareas completadas (100%)
     resumen_tema_100 = completadas_100.groupby("Tema")["Tarea"].count()
     total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
@@ -379,37 +379,37 @@ elif seccion == "Checklist de semanerx":
     fig_100.update_traces(textposition='outside')
     fig_100.update_layout(yaxis_range=[0, 100])
     st.plotly_chart(fig_100, use_container_width=True)
+            
+        # # Gráfico de tareas en proceso
+        # if not completadas_incompletas.empty:
+        #     resumen_proceso = completadas_incompletas.groupby("Tema")["Tarea"].count()
+        #     chart_data_proc = resumen_proceso.reset_index().rename(columns={"Tarea": "En proceso"})
+        #     fig_proc = px.bar(
+        #         chart_data_proc,
+        #         x="Tema",
+        #         y="En proceso",
+        #         text="En proceso",
+        #         color_discrete_sequence=["#FFA726"],
+        #         title="🟠 Tareas en proceso por tema"
+        #     )
+        #     fig_proc.update_traces(textposition='outside')
+        #     #st.plotly_chart(fig_proc, use_container_width=True)
         
-        # Gráfico de tareas en proceso
-        if not completadas_incompletas.empty:
-            resumen_proceso = completadas_incompletas.groupby("Tema")["Tarea"].count()
-            chart_data_proc = resumen_proceso.reset_index().rename(columns={"Tarea": "En proceso"})
-            fig_proc = px.bar(
-                chart_data_proc,
-                x="Tema",
-                y="En proceso",
-                text="En proceso",
-                color_discrete_sequence=["#FFA726"],
-                title="🟠 Tareas en proceso por tema"
-            )
-            fig_proc.update_traces(textposition='outside')
-            #st.plotly_chart(fig_proc, use_container_width=True)
-        
-        # Gráfico de tareas no iniciadas
-        todas_tareas = df_tareas.copy()
-        no_iniciadas = todas_tareas[~todas_tareas["Tarea"].isin(completadas_total_tareas)]
-        if not no_iniciadas.empty:
-            resumen_no_iniciadas = no_iniciadas.groupby("Tema")["Tarea"].count().reset_index().rename(columns={"Tarea": "No iniciadas"})
-            fig_no = px.bar(
-                resumen_no_iniciadas,
-                x="Tema",
-                y="No iniciadas",
-                text="No iniciadas",
-                color_discrete_sequence=["#B0BEC5"],
-                title="⬜ Tareas no iniciadas por tema"
-            )
-            fig_no.update_traces(textposition='outside')
-            #st.plotly_chart(fig_no, use_container_width=True)
+        # # Gráfico de tareas no iniciadas
+        # todas_tareas = df_tareas.copy()
+        # no_iniciadas = todas_tareas[~todas_tareas["Tarea"].isin(completadas_total_tareas)]
+        # if not no_iniciadas.empty:
+        #     resumen_no_iniciadas = no_iniciadas.groupby("Tema")["Tarea"].count().reset_index().rename(columns={"Tarea": "No iniciadas"})
+        #     fig_no = px.bar(
+        #         resumen_no_iniciadas,
+        #         x="Tema",
+        #         y="No iniciadas",
+        #         text="No iniciadas",
+        #         color_discrete_sequence=["#B0BEC5"],
+        #         title="⬜ Tareas no iniciadas por tema"
+        #     )
+        #     fig_no.update_traces(textposition='outside')
+        #     #st.plotly_chart(fig_no, use_container_width=True)
 
 
 
@@ -466,6 +466,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
