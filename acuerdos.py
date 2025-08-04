@@ -84,7 +84,8 @@ seccion = st.selectbox("🌿 Explorar secciones", [
     "Acuerdos Comunicación Externa",
     "Videos y recursos",
     "Tareas semanerxs por zona",
-    "Checklist de semanerx"
+    "Checklist de semanerx",
+    "🔗 Links claves"
 ])
 
 if seccion == "":
@@ -104,6 +105,38 @@ if seccion == "":
 
         Usa los menús desplegables arriba para explorar cada sección. 🌱
         """)
+
+elif seccion == "🔗 Links claves":
+    df = cargar_datos("links")
+    df = df.rename(columns={
+        "Tema": "Tema",
+        "Nombre": "Nombre",
+        "Descripción": "Descripción",
+        "url": "URL"
+    })
+    temas = df["Tema"].unique()
+    ver_todo = st.checkbox("📋 Ver todos los enlaces")
+    if ver_todo:
+        for tema in temas:
+            st.subheader(f"🔸 {tema}")
+            subset = df[df["Tema"] == tema]
+            for _, row in subset.iterrows():
+                st.markdown(f"**{row['Nombre']}**")
+                st.markdown(f"{row['Descripción']}")
+                st.markdown(f"[Abrir enlace]({row['URL']})")
+    else:
+        tema = st.selectbox("Selecciona un tema:", [""] + list(temas))
+        if tema:
+            subset = df[df["Tema"] == tema]
+            for _, row in subset.iterrows():
+                st.markdown(f"### 🔗 {row['Nombre']}")
+                st.markdown(f"{row['Descripción']}")
+                st.markdown(f"[Abrir enlace]({row['URL']})")
+        for _, row in subset.iterrows():
+            st.markdown(f"### 🔗 {row['Nombre']}")
+            st.markdown(f"{row['Descripción']}")
+            st.markdown(f"[Abrir enlace]({row['URL']})")
+
 
 elif seccion == "Tareas semanerxs por zona":
     df = cargar_datos("tareas_semaneros")
@@ -466,6 +499,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
