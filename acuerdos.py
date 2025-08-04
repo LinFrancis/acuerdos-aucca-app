@@ -223,6 +223,12 @@ elif seccion == "✅ Checklist de semanero":
             )
 
             if completada:
+                with st.expander(f"✏️ Completa los detalles para esta tarea:"):
+                    porcentaje = st.slider("¿Cuánto se completó esta tarea?", min_value=0, max_value=100, value=100, step=10, key=f"porc_{tarea_id}")
+                    observacion = st.text_area("Observaciones", key=f"obs_{tarea_id}")
+            
+                estado = "Sí" if porcentaje == 100 else "En proceso"
+            
                 creds = Credentials.from_service_account_info(
                     st.secrets["gspread"],
                     scopes=[
@@ -233,8 +239,18 @@ elif seccion == "✅ Checklist de semanero":
                 client = gspread.authorize(creds)
                 sh = client.open_by_key("1C8njkp0RQMdXnxuJvPvfK_pNZHQSi7q7dUPeUg-2624")
                 worksheet = sh.worksheet("estado_tareas")
-                worksheet.append_row([hoy.strftime("%Y-%m-%d %H:%M"), nombre, row["Tema"], row["Zona"], row["Tarea"], "Sí"])
-                st.success(f"✅ Tarea registrada: {row['Zona']} - {row['Tarea']}")
+                worksheet.append_row([
+                    hoy.strftime("%Y-%m-%d %H:%M"),
+                    nombre,
+                    row["Tema"],
+                    row["Zona"],
+                    row["Tarea"],
+                    estado,
+                    porcentaje,
+                    observacion
+                ])
+                st.success(f"✅ Tarea registrada: {row['Zona']} - {row['Tarea']} ({estado}, {porcentaje}%)")
+
 
     # Mostrar resumen por tema
     st.markdown("---")
@@ -345,5 +361,6 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
