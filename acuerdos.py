@@ -240,7 +240,10 @@ elif seccion == "✅ Checklist de semanero":
             if completada:
                 st.markdown(f"#### {row['Zona']}: {row['Tarea']}")
                 with st.expander("✏️ Completa los detalles para esta tarea:", expanded=True):
-                    porcentaje = st.slider("¿Cuánto se completó esta tarea?", min_value=0, max_value=100, value=100, step=10, key=f"porc_{tarea_id}")
+                    porcentaje = st.slider(
+                        "¿Cuánto se completó esta tarea?",
+                        min_value=0, max_value=100, value=100, step=10, key=f"porc_{tarea_id}"
+                    )
                     observacion = st.text_area("Observaciones", key=f"obs_{tarea_id}")
                     registrar = st.button("Registrar", key=f"btn_{tarea_id}")
         
@@ -267,6 +270,7 @@ elif seccion == "✅ Checklist de semanero":
                         observacion
                     ])
                     st.success(f"✅ Tarea registrada: {row['Zona']} - {row['Tarea']} ({estado}, {porcentaje}%)")
+
         
 
     # Mostrar resumen por tema
@@ -456,6 +460,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
