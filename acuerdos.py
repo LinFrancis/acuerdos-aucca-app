@@ -184,7 +184,8 @@ elif seccion == "✅ Checklist de semanero":
     fecha_inicio = datetime.datetime.combine(rango_fecha[0], datetime.datetime.min.time())
     fecha_fin = datetime.datetime.combine(rango_fecha[1], datetime.datetime.max.time())
     st.markdown(f"#### Hoy es {datetime.datetime.now().strftime('%A %d de %B de %Y, %H:%M')} 🗓️")
-    st.title("✅ Checklist de semanero")
+    
+    st.markdown("✅ Checklist de semanerx ")
     st.caption("Revisa y marca las tareas que se han realizado durante la semana.")
 
     semaneros = ["Chalo", "Camilú", "Niko", "Diego", "Francis", "Tais", "Cala"]
@@ -227,7 +228,7 @@ elif seccion == "✅ Checklist de semanero":
             
                 with st.expander("✏️ Completa los detalles para esta tarea:", expanded=True):
                     porcentaje = st.slider(
-                        "¿Cuánto se completó esta tarea? (estimación)",
+                        "¿Cuánto se completó esta tarea?",
                         min_value=0,
                         max_value=100,
                         value=100,
@@ -235,32 +236,35 @@ elif seccion == "✅ Checklist de semanero":
                         key=f"porc_{tarea_id}"
                     )
                     observacion = st.text_area("Observaciones", key=f"obs_{tarea_id}")
+                    registrar = st.button("Registrar", key=f"btn_{tarea_id}")
             
-                estado = "Sí" if porcentaje == 100 else "En proceso"
+                if registrar:
+                    estado = "Sí" if porcentaje == 100 else "En proceso"
             
-                creds = Credentials.from_service_account_info(
-                    st.secrets["gspread"],
-                    scopes=[
-                        "https://spreadsheets.google.com/feeds",
-                        "https://www.googleapis.com/auth/drive"
-                    ]
-                )
-                client = gspread.authorize(creds)
-                sh = client.open_by_key("1C8njkp0RQMdXnxuJvPvfK_pNZHQSi7q7dUPeUg-2624")
-                worksheet = sh.worksheet("estado_tareas")
+                    creds = Credentials.from_service_account_info(
+                        st.secrets["gspread"],
+                        scopes=[
+                            "https://spreadsheets.google.com/feeds",
+                            "https://www.googleapis.com/auth/drive"
+                        ]
+                    )
+                    client = gspread.authorize(creds)
+                    sh = client.open_by_key("1C8njkp0RQMdXnxuJvPvfK_pNZHQSi7q7dUPeUg-2624")
+                    worksheet = sh.worksheet("estado_tareas")
             
-                worksheet.append_row([
-                    hoy.strftime("%Y-%m-%d %H:%M"),
-                    nombre,
-                    row["Tema"],
-                    row["Zona"],
-                    row["Tarea"],
-                    estado,
-                    porcentaje,
-                    observacion
-                ])
+                    worksheet.append_row([
+                        hoy.strftime("%Y-%m-%d %H:%M"),
+                        nombre,
+                        row["Tema"],
+                        row["Zona"],
+                        row["Tarea"],
+                        estado,
+                        porcentaje,
+                        observacion
+                    ])
             
-                st.success(f"✅ Tarea registrada: {row['Zona']} - {row['Tarea']} ({estado}, {porcentaje}%)")
+                    st.success(f"✅ Tarea registrada: {row['Zona']} - {row['Tarea']} ({estado}, {porcentaje}%)")
+
 
 
     # Mostrar resumen por tema
@@ -372,6 +376,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
