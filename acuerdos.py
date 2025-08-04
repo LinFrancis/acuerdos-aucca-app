@@ -119,9 +119,26 @@ elif seccion == "Tareas por zona (semanerxs)":
         for _, row in subset.iterrows():
             st.markdown(f"#### {row['Elemento o espacio específico']}")
             st.markdown(f"{row['Detalle de lo que debe realizarse']}")
-    for _, row in subset.iterrows():
-        st.markdown(f"#### {row['Elemento o espacio específico']}")
-        st.markdown(f"{row['Detalle de lo que debe realizarse']}")
+
+
+
+# elif seccion == "Tareas por zona (semanerxs)":
+#     df = cargar_datos("tareas_semaneros")
+#     df = df.rename(columns={
+#         "Tema": "Área de responsabilidad semanal",
+#         "Zona": "Elemento o espacio específico",
+#         "Tarea": "Detalle de lo que debe realizarse"
+#     })
+#     temas = df['Área de responsabilidad semanal'].unique()
+#     tema = st.selectbox("🌱 Selecciona un área de responsabilidad semanal:", [""] + list(temas))
+#     if tema:
+#         subset = df[df['Área de responsabilidad semanal'] == tema]
+#         for _, row in subset.iterrows():
+#             st.markdown(f"#### {row['Elemento o espacio específico']}")
+#             st.markdown(f"{row['Detalle de lo que debe realizarse']}")
+#     for _, row in subset.iterrows():
+#         st.markdown(f"#### {row['Elemento o espacio específico']}")
+#         st.markdown(f"{row['Detalle de lo que debe realizarse']}")
 
 elif seccion == "Acuerdos de convivencia (internos)":
     df = cargar_datos("acuerdos_internos")
@@ -521,6 +538,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
