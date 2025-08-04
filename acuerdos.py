@@ -310,7 +310,7 @@ elif seccion == "✅ Checklist de semanero":
         
         # Mostrar tareas completadas
         if not completadas_100.empty:
-            st.markdown("###Tareas completadas (100%)")
+            st.markdown("### Tareas completadas (100%)")
             st.dataframe(
                 completadas_100[["Zona","Fecha","Tarea","Auccane","Observaciones"]]
                 .sort_values("Fecha", ascending=False)
@@ -319,7 +319,7 @@ elif seccion == "✅ Checklist de semanero":
         
         # Mostrar tareas en proceso
         if not en_proceso.empty:
-            st.markdown("###Tareas comenzadas pero no finalizadas")
+            st.markdown("### Tareas comenzadas pero no finalizadas")
             st.dataframe(
                 en_proceso[["Fecha", "Auccane", "Zona", "Tarea", "Porcentaje", "Observaciones"]]
                 .sort_values("Fecha", ascending=False)
@@ -459,6 +459,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
