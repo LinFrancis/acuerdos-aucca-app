@@ -268,9 +268,6 @@ elif seccion == "✅ Checklist de semanero":
         st.markdown("**⬜ Tareas pendientes:**")
         st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
 
-        st.markdown("**⬜ Tareas pendientes:**")
-        st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
-
     # Gráfico de barras interactivo
     import plotly.express as px
     completadas = df_estado[(pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) & (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)]
@@ -327,15 +324,15 @@ elif seccion == "✅ Checklist de semanero":
             st.markdown("**Temas en los que más ha contribuido:**")
             st.dataframe(resumen_aucane.sort_values("Tareas completadas", ascending=False))
 
-            fig_aucane = px.pie(
-                resumen_aucane,
-                names="Tema",
-                values="Tareas completadas",
-                title=f"Distribución de aportes de {aucane} por tema",
-                color_discrete_sequence=["#4C9A2A"]
-            )
-            st.plotly_chart(fig_aucane, use_container_width=True)
-            st.dataframe(completadas[["Fecha", "Usuario", "Tema", "Zona", "Tarea"]].sort_values("Fecha", ascending=False))
+            # fig_aucane = px.pie(
+            #     resumen_aucane,
+            #     names="Tema",
+            #     values="Tareas completadas",
+            #     title=f"Distribución de aportes de {aucane} por tema",
+            #     color_discrete_sequence=["#4C9A2A"]
+            # )
+            # st.plotly_chart(fig_aucane, use_container_width=True)
+            # st.dataframe(completadas[["Fecha", "Usuario", "Tema", "Zona", "Tarea"]].sort_values("Fecha", ascending=False))
 
             completadas = df_estado[df_estado["Semana"] == semana_actual]
             resumen_tema = completadas.groupby("Tema")["Tarea"].count()
@@ -348,3 +345,4 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
