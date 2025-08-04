@@ -129,18 +129,17 @@ elif seccion == "Acuerdos de convivencia (internos)":
 
     if ver_todo:
         for tema in temas:
-            st.subheader(f"🟢 {tema}")
-            if tema:
-                subset = df[df['Tema'] == tema].sort_values("Número de orden")
-            for _, row in subset.iterrows():
-                st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
-            for _, row in subset.iterrows():
-                st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
+            subset = df[df['Tema'] == tema].sort_values("Número de orden")
+            with st.expander(f"🟢 {tema}", expanded=True):
+                for _, row in subset.iterrows():
+                    st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
     else:
         tema = st.selectbox("🪴 Selecciona un tema:", [""] + list(temas))
-        subset = df[df['Tema'] == tema].sort_values("Número de orden")
-        for _, row in subset.iterrows():
-            st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
+        if tema:
+            subset = df[df['Tema'] == tema].sort_values("Número de orden")
+            st.subheader(f"🟢 {tema}")
+            for _, row in subset.iterrows():
+                st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
 
 elif seccion == "Acuerdos Comunicación Externa":
     df = cargar_datos("actuerdos_externos")
@@ -265,103 +264,68 @@ elif seccion == "✅ Checklist de semanero":
             
                     st.success(f"✅ Tarea registrada: {row['Zona']} - {row['Tarea']} ({estado}, {porcentaje}%)")
         
-        # Mostrar resumen por tema
-        st.markdown("---")
-        st.subheader("📊 Resumen de tareas completadas por tema (esta semana)")
-        
-        # Filtrar tareas completadas en el rango seleccionado
-        completadas = df_estado[
-            (pd.to_datetime(df_estado["Fecha"], format="%Y-%m-%d %H:%M") >= fecha_inicio) &
-            (pd.to_datetime(df_estado["Fecha"], format="%Y-%m-%d %H:%M") <= fecha_fin)
-        ]
-        
-        # Crear resumen
-        resumen = pd.DataFrame({
-            "Completadas": completadas.groupby("Tema")["Tarea"].count(),
-            "Total": df_tareas.groupby("Tema")["Tarea"].count(),
-            "Promedio %": completadas.groupby("Tema")["Porcentaje"].mean().round(1)
-        }).fillna(0)
-        
-        resumen["% completado"] = ((resumen["Completadas"] / resumen["Total"]) * 100).round(1)
-        
-        # Mostrar gráfico
-        import plotly.express as px
-        chart_data = resumen.reset_index()
-        fig = px.bar(
-            chart_data,
-            x="Tema",
-            y="% completado",
-            text=chart_data["% completado"].astype(str) + "%",
-            color_discrete_sequence=["#4C9A2A"],
-            hover_data={"Total": True, "Completadas": True, "% completado": True, "Promedio %": True},
-            labels={"% completado": "% Completado"},
-            title="Porcentaje de tareas completadas por tema"
-        )
-        fig.update_traces(textposition="outside")
-        fig.update_layout(yaxis_range=[0, 100])
-        st.plotly_chart(fig, use_container_width=True)
+      
 
 
+    # Mostrar resumen por tema
+    st.markdown("---")
+    st.subheader("Resumen de tareas completadas por tema (esta semana)")
 
-#     # Mostrar resumen por tema
-#     st.markdown("---")
-#     st.subheader("📊 Resumen de tareas completadas por tema (esta semana)")
+    # Calcular resumen antes de usarlo
+    completadas = df_estado[(pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) & (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)]
+    resumen_tema = completadas.groupby("Tema")["Tarea"].count()
+    total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
+    resumen = pd.DataFrame({
+        "Completadas": resumen_tema,
+        "Total": total_por_tema
+    }).fillna(0).astype(int)
+    resumen["% completado"] = ((resumen["Completadas"] / resumen["Total"]) * 100).round(1).astype(str) + "%"
 
-#     # Calcular resumen antes de usarlo
-#     completadas = df_estado[(pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) & (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)]
-#     resumen_tema = completadas.groupby("Tema")["Tarea"].count()
-#     total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
-#     resumen = pd.DataFrame({
-#         "Completadas": resumen_tema,
-#         "Total": total_por_tema
-#     }).fillna(0).astype(int)
-#     resumen["% completado"] = ((resumen["Completadas"] / resumen["Total"]) * 100).round(1).astype(str) + "%"
+# Mostrar selector ahora que resumen está definido
+    tema_seleccionado = st.selectbox("🔍 Selecciona un tema para ver detalles:", [""] + resumen.index.tolist())
+    if tema_seleccionado:
+        tareas_tema = df_tareas[df_tareas["Tema"] == tema_seleccionado]
+        completadas_tema = completadas[completadas["Tema"] == tema_seleccionado]
 
-# # Mostrar selector ahora que resumen está definido
-#     tema_seleccionado = st.selectbox("🔍 Selecciona un tema para ver detalles:", [""] + resumen.index.tolist())
-#     if tema_seleccionado:
-#         tareas_tema = df_tareas[df_tareas["Tema"] == tema_seleccionado]
-#         completadas_tema = completadas[completadas["Tema"] == tema_seleccionado]
+        st.markdown("**✅ Tareas realizadas:**")
+        if 'completadas_tema' in locals():
+            st.dataframe(completadas_tema[["Fecha", "Usuario", "Zona", "Tarea"]].sort_values("Fecha", ascending=False))
+        else:
+            st.info("Selecciona un tema para ver tareas completadas y pendientes.")
 
-#         st.markdown("**✅ Tareas realizadas:**")
-#         if 'completadas_tema' in locals():
-#             st.dataframe(completadas_tema[["Fecha", "Usuario", "Zona", "Tarea"]].sort_values("Fecha", ascending=False))
-#         else:
-#             st.info("Selecciona un tema para ver tareas completadas y pendientes.")
+        realizadas = completadas_tema["Tarea"].unique().tolist()
+        pendientes_tema = tareas_tema[~tareas_tema["Tarea"].isin(realizadas)]
 
-#         realizadas = completadas_tema["Tarea"].unique().tolist()
-#         pendientes_tema = tareas_tema[~tareas_tema["Tarea"].isin(realizadas)]
+        st.markdown("**⬜ Tareas pendientes:**")
+        st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
 
-#         st.markdown("**⬜ Tareas pendientes:**")
-#         st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
+    # Gráfico de barras interactivo
+    import plotly.express as px
+    completadas = df_estado[(pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) & (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)]
+    resumen_tema = completadas.groupby("Tema")["Tarea"].count()
+    total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
+    resumen = pd.DataFrame({
+        "Completadas": resumen_tema,
+        "Total": total_por_tema
+    }).fillna(0).astype(int)
+    resumen["% completado"] = ((resumen["Completadas"] / resumen["Total"]) * 100).round(1).astype(str) + "%"
 
-#     # Gráfico de barras interactivo
-#     import plotly.express as px
-#     completadas = df_estado[(pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) & (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)]
-#     resumen_tema = completadas.groupby("Tema")["Tarea"].count()
-#     total_por_tema = df_tareas.groupby("Tema")["Tarea"].count()
-#     resumen = pd.DataFrame({
-#         "Completadas": resumen_tema,
-#         "Total": total_por_tema
-#     }).fillna(0).astype(int)
-#     resumen["% completado"] = ((resumen["Completadas"] / resumen["Total"]) * 100).round(1).astype(str) + "%"
+    chart_data = resumen.reset_index()
+    fig = px.bar(
+        chart_data,
+        x="Tema",
+        y="% completado",
+        text=resumen["% completado"].astype(str) + "%",
+        color_discrete_sequence=["#4C9A2A"],
+        hover_data={"Total": True, "% completado": True, "Completadas": True},
+        labels={"% completado": "% Completado"},
+        title="Porcentaje de tareas completadas por tema"
+    )
+    fig.update_traces(textposition='outside')
+    fig.update_layout(yaxis_range=[0, 100])
+    st.plotly_chart(fig, use_container_width=True)
 
-#     chart_data = resumen.reset_index()
-#     fig = px.bar(
-#         chart_data,
-#         x="Tema",
-#         y="% completado",
-#         text=resumen["% completado"].astype(str) + "%",
-#         color_discrete_sequence=["#4C9A2A"],
-#         hover_data={"Total": True, "% completado": True, "Completadas": True},
-#         labels={"% completado": "% Completado"},
-#         title="Porcentaje de tareas completadas por tema"
-#     )
-#     fig.update_traces(textposition='outside')
-#     fig.update_layout(yaxis_range=[0, 100])
-#     st.plotly_chart(fig, use_container_width=True)
-
-    with st.expander("🕒 Ver registros detallados por aucane"):
+    with st.expander("Ver registros detallados por aucane"):
         aucane = st.selectbox("Selecciona una persona:", [""] + sorted(completadas["Usuario"].unique().tolist()))
         if aucane:
             registros_aucane = completadas[completadas["Usuario"] == aucane].sort_values("Fecha", ascending=False)
@@ -412,6 +376,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
