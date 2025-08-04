@@ -44,14 +44,14 @@ hr {
 st.markdown(eco_css, unsafe_allow_html=True)
 
 # Mostrar logo y cabecera
-top1, top2 = st.columns([1, 10])
+top1, top2 = st.columns([2, 9])
 with top1:
     st.image("images/logo_aucca.png", width=120)
 with top2:
     st.title("Acuerdos")
 
 st.caption("Corazón = Mente = Espíritu = Conciencia 👂🏾🧠🫀")
-st.markdown("""
+# st.markdown("""
 Esta aplicación es una herramienta comunitaria para quienes habitamos el centro eco-pedagógico AUCCA.
 Nace de nuestra intención de construir un mejor día a día, reconociendo que el buen vivir también se cultiva
 en lo cotidiano: en el cuidado del espacio, de las relaciones, de las confianzas y de los acuerdos.
