@@ -125,16 +125,16 @@ elif seccion == "Acuerdos de convivencia (internos)":
         "Acuerdo": "Acuerdo"
     })
     temas = df['Tema'].unique()
-    ver_todo = st.checkbox("📜 Ver todos los acuerdos por tema")
+    ver_todo = st.checkbox("Ver todos los acuerdos por tema")
 
     if ver_todo:
         for tema in temas:
             subset = df[df['Tema'] == tema].sort_values("Número de orden")
-            with st.expander(f"🟢 {tema}", expanded=True):
+            with st.expander(f"🟢 {tema}", expanded=False):
                 for _, row in subset.iterrows():
                     st.markdown(f"{row['Número de orden']}. {row['Acuerdo']}")
     else:
-        tema = st.selectbox("🪴 Selecciona un tema:", [""] + list(temas))
+        tema = st.selectbox("Selecciona un tema:", [""] + list(temas))
         if tema:
             subset = df[df['Tema'] == tema].sort_values("Número de orden")
             st.subheader(f"🟢 {tema}")
@@ -149,7 +149,7 @@ elif seccion == "Acuerdos Comunicación Externa":
         "Detalle": "Detalle del acuerdo"
     })
     tipos = df['Tipo de acuerdo'].unique()
-    tipo = st.selectbox("🤝 Selecciona un tipo de acuerdo:", [""] + list(tipos))
+    tipo = st.selectbox("Selecciona un tipo de acuerdo:", [""] + list(tipos))
     if tipo:
         subset = df[df['Tipo de acuerdo'] == tipo]
         for _, row in subset.iterrows():
@@ -213,7 +213,7 @@ elif seccion == "✅ Checklist de semanero":
         df_pendientes = pd.DataFrame(columns=df_tareas.columns)
 
     for tema in df_pendientes["Tema"].unique():
-        st.markdown(f"### 🌱 {tema}")
+        st.markdown(f"#### 🌱 {tema}")
         subtareas = df_pendientes[df_pendientes["Tema"] == tema]
 
         for _, row in subtareas.iterrows():
@@ -292,12 +292,32 @@ elif seccion == "✅ Checklist de semanero":
             st.dataframe(completadas_tema[["Fecha", "Usuario", "Zona", "Tarea"]].sort_values("Fecha", ascending=False))
         else:
             st.info("Selecciona un tema para ver tareas completadas y pendientes.")
-
-        realizadas = completadas_tema["Tarea"].unique().tolist()
-        pendientes_tema = tareas_tema[~tareas_tema["Tarea"].isin(realizadas)]
-
+        
+        # Filtrar tareas completadas al 100%
+        completadas_100 = completadas_tema[completadas_tema["Porcentaje"].astype(int) == 100]
+        realizadas = completadas_100["Tarea"].unique().tolist()
+        
+        # Filtrar tareas en proceso (porcentaje entre 1 y 99)
+        en_proceso = completadas_tema[(completadas_tema["Porcentaje"].astype(int) > 0) & (completadas_tema["Porcentaje"].astype(int) < 100)]
+        
+        # Identificar tareas aún no registradas
+        pendientes_tema = tareas_tema[~tareas_tema["Tarea"].isin(completadas_tema["Tarea"])]
+        
+        # Mostrar tareas completadas
+        st.markdown("**✅ Tareas completadas (100%):**")
+        st.dataframe(completadas_100[["Fecha", "Usuario", "Zona", "Tarea", "Porcentaje", "Observaciones"]].sort_values("Fecha", ascending=False))
+        
+        # Mostrar tareas en proceso
+        if not en_proceso.empty:
+            st.markdown("**🟡 Tareas en proceso:**")
+            st.dataframe(en_proceso[["Fecha", "Usuario", "Zona", "Tarea", "Porcentaje", "Observaciones"]].sort_values("Fecha", ascending=False))
+        
+        # Mostrar tareas pendientes
         st.markdown("**⬜ Tareas pendientes:**")
         st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
+        
+
+
 
     # Gráfico de barras interactivo
     import plotly.express as px
@@ -376,6 +396,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
