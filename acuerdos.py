@@ -378,7 +378,7 @@ elif seccion == "Checklist de semanerx":
         )
         fig_100.update_traces(textposition='outside')
         fig_100.update_layout(yaxis_range=[0, 100])
-        st.plotly_chart(fig_100, use_container_width=True)
+    st.plotly_chart(fig_100, use_container_width=True)
         
         # Gráfico de tareas en proceso
         if not completadas_incompletas.empty:
@@ -466,6 +466,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
