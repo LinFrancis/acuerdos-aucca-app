@@ -80,11 +80,11 @@ if st.button("Actualizar Base de datos"):
 # Navegación principal sin sidebar
 seccion = st.selectbox("🌿 Explorar secciones", [
     "",
-    "Tareas por zona (semanerxs)",
     "Acuerdos de convivencia (internos)",
     "Acuerdos Comunicación Externa",
     "Videos y recursos",
-    "✅ Checklist de semanero"
+    "Tareas semanerxs por zona",
+    "Checklist de semanerx"
 ])
 
 if seccion == "":
@@ -96,16 +96,16 @@ if seccion == "":
         #### ¿Qué encontrarás aquí?
         Esta aplicación contiene acuerdos y tareas organizadas por temas, zonas y tipo de convivencia.
 
-        - **Tareas por zona (semanerxs)**: responsabilidades de limpieza y mantenimiento profundo.
+        - **Tareas semanerxs por zona**: responsabilidades de limpieza y mantenimiento profundo.
         - **Acuerdos de convivencia (internos)**: lo que hemos decidido como comunidad para convivir mejor.
         - **Acuerdos de comunicación externa**: cómo nos relacionamos con organizaciones, visitas y talleres.
         - **Videos y recursos**: materiales visuales de apoyo.
-        - **Check List semanerxs **: sistema de registro de avances en actividades de semanerxs. 
+        - **Check List semanerxs**: sistema de registro de avances en actividades de semanerxs. 
 
         Usa los menús desplegables arriba para explorar cada sección. 🌱
         """)
 
-elif seccion == "Tareas por zona (semanerxs)":
+elif seccion == "Tareas semanerxs por zona":
     df = cargar_datos("tareas_semaneros")
     df = df.rename(columns={
         "Tema": "Área de responsabilidad semanal",
@@ -122,7 +122,7 @@ elif seccion == "Tareas por zona (semanerxs)":
 
 
 
-# elif seccion == "Tareas por zona (semanerxs)":
+# elif seccion == "Tareas semanerxs por zona":
 #     df = cargar_datos("tareas_semaneros")
 #     df = df.rename(columns={
 #         "Tema": "Área de responsabilidad semanal",
@@ -187,7 +187,7 @@ elif seccion == "Videos y recursos":
     st.video("luz_solar_chalo.mp4")
     st.markdown("Este video explica cómo funciona la electricidad solar en AUCCA. Pronto agregaremos nuevos videos para cada tema.")
 
-elif seccion == "✅ Checklist de semanero":
+elif seccion == "Checklist de semanerx":
     inicio_semana = datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())
     fin_semana = inicio_semana + datetime.timedelta(days=6)
     inicio_semana = datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())
@@ -538,6 +538,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
