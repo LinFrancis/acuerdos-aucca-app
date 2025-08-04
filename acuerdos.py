@@ -294,7 +294,9 @@ elif seccion == "✅ Checklist de semanero":
             st.info("Selecciona un tema para ver tareas completadas y pendientes.")
         
         # Filtrar tareas completadas al 100%
-        completadas_100 = completadas_tema[completadas_tema["Porcentaje"].astype(int) == 100]
+        completadas_tema["Porcentaje"] = pd.to_numeric(completadas_tema["Porcentaje"], errors="coerce").fillna(0).astype(int)
+        completadas_100 = completadas_tema[completadas_tema["Porcentaje"] == 100]
+
         realizadas = completadas_100["Tarea"].unique().tolist()
         
         # Filtrar tareas en proceso (porcentaje entre 1 y 99)
@@ -396,6 +398,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
