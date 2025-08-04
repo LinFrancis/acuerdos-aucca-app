@@ -115,6 +115,7 @@ elif seccion == "Links claves":
     })
     temas = df["Tema"].unique()
     ver_todo = st.checkbox("📋 Ver todos los enlaces")
+    
     if ver_todo:
         for tema in temas:
             st.subheader(f"🔸 {tema}")
@@ -131,10 +132,6 @@ elif seccion == "Links claves":
                 st.markdown(f"### 🔗 {row['Nombre']}")
                 st.markdown(f"{row['Descripción']}")
                 st.markdown(f"[Abrir enlace]({row['URL']})")
-        for _, row in subset.iterrows():
-            st.markdown(f"### 🔗 {row['Nombre']}")
-            st.markdown(f"{row['Descripción']}")
-            st.markdown(f"[Abrir enlace]({row['URL']})")
 
 
 elif seccion == "Tareas semanerxs por zona":
@@ -498,6 +495,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
