@@ -293,34 +293,48 @@ elif seccion == "✅ Checklist de semanero":
         else:
             st.info("Selecciona un tema para ver tareas completadas y pendientes.")
         
-        # Filtrar tareas completadas al 100%
-        completadas_tema["Porcentaje"] = pd.to_numeric(completadas_tema["Porcentaje"], errors="coerce").fillna(0).astype(int)
-        completadas_100 = completadas_tema[completadas_tema["Porcentaje"] == 100]
+        
 
-        realizadas = completadas_100["Tarea"].unique().tolist()
+        # Convertir Porcentaje a número y renombrar columna Usuario → Auccane
+        completadas_tema["Porcentaje"] = pd.to_numeric(completadas_tema["Porcentaje"], errors="coerce").fillna(0).astype(int)
+        completadas_tema = completadas_tema.rename(columns={"Usuario": "Auccane"})
         
-        # Filtrar tareas en proceso (porcentaje entre 1 y 99)
-        en_proceso = completadas_tema[(completadas_tema["Porcentaje"].astype(int) > 0) & (completadas_tema["Porcentaje"].astype(int) < 100)]
-        
-        # Identificar tareas aún no registradas
-        pendientes_tema = tareas_tema[~tareas_tema["Tarea"].isin(completadas_tema["Tarea"])]
+        # Dividir tareas completadas (100%) y en proceso
+        completadas_100 = completadas_tema[completadas_tema["Porcentaje"] == 100]
+        en_proceso = completadas_tema[(completadas_tema["Porcentaje"] > 0) & (completadas_tema["Porcentaje"] < 100)]
         
         # Mostrar tareas completadas
-        st.markdown("**✅ Tareas completadas (100%):**")
-        st.dataframe(completadas_100[["Fecha", "Usuario", "Zona", "Tarea", "Porcentaje", "Observaciones"]].sort_values("Fecha", ascending=False))
+        if not completadas_100.empty:
+            st.markdown("### ✅ Tareas completadas (100%)")
+            st.dataframe(
+                completadas_100[["Fecha", "Auccane", "Zona", "Tarea", "Observaciones"]]
+                .sort_values("Fecha", ascending=False)
+                .style.set_properties(subset=["Observaciones"], **{"white-space": "pre-wrap"})
+            )
         
         # Mostrar tareas en proceso
         if not en_proceso.empty:
-            st.markdown("**🟡 Tareas en proceso:**")
-            st.dataframe(en_proceso[["Fecha", "Usuario", "Zona", "Tarea", "Porcentaje", "Observaciones"]].sort_values("Fecha", ascending=False))
+            st.markdown("### 🟠 Tareas comenzadas pero no finalizadas")
+            st.dataframe(
+                en_proceso[["Fecha", "Auccane", "Zona", "Tarea", "Porcentaje", "Observaciones"]]
+                .sort_values("Fecha", ascending=False)
+                .style.set_properties(subset=["Observaciones"], **{"white-space": "pre-wrap"})
+            )
+        
+        # Filtrar tareas que no han sido registradas
+        realizadas = completadas_100["Tarea"].unique().tolist()
+        pendientes_tema = tareas_tema[~tareas_tema["Tarea"].isin(realizadas)]
         
         # Mostrar tareas pendientes
-        st.markdown("**⬜ Tareas pendientes:**")
+        st.markdown("### ⬜ Tareas pendientes")
         st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
+
         
-
-
-
+        
+        
+        
+        
+        
     # Gráfico de barras interactivo
     import plotly.express as px
     completadas = df_estado[(pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') >= fecha_inicio) & (pd.to_datetime(df_estado["Fecha"], format='%Y-%m-%d %H:%M') <= fecha_fin)]
@@ -398,6 +412,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
