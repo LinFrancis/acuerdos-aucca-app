@@ -292,7 +292,7 @@ elif seccion == "✅ Checklist de semanero":
         tareas_tema = df_tareas[df_tareas["Tema"] == tema_seleccionado]
         completadas_tema = completadas[completadas["Tema"] == tema_seleccionado]
 
-        st.markdown("**Tareas realizadas:**")
+        st.markdown("#### Tareas realizadas:")
         if 'completadas_tema' in locals():
             completadas_tema = completadas_tema.rename(columns={"Usuario": "Auccane"})
             st.dataframe(completadas_tema[["Zona", "Tarea", "Porcentaje","Auccane", "Observaciones","Fecha"]].sort_values("Fecha", ascending=False))
@@ -319,7 +319,7 @@ elif seccion == "✅ Checklist de semanero":
         
         # Mostrar tareas en proceso
         if not en_proceso.empty:
-            st.markdown("### Tareas comenzadas pero no finalizadas")
+            st.markdown("#### Tareas comenzadas pero no finalizadas")
             st.dataframe(
                 en_proceso[["Fecha", "Auccane", "Zona", "Tarea", "Porcentaje", "Observaciones"]]
                 .sort_values("Fecha", ascending=False)
@@ -331,7 +331,7 @@ elif seccion == "✅ Checklist de semanero":
         pendientes_tema = tareas_tema[~tareas_tema["Tarea"].isin(realizadas)]
         
         # Mostrar tareas pendientes
-        st.markdown("###Tareas pendientes")
+        st.markdown("#### Tareas pendientes")
         st.dataframe(pendientes_tema[["Zona", "Tarea"]].reset_index(drop=True))
 
 
@@ -459,6 +459,7 @@ elif seccion == "✅ Checklist de semanero":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
