@@ -53,8 +53,6 @@ with top2:
 st.caption("Corazón = Mente = Espíritu = Conciencia 👂🏾🧠🫀")
 st.markdown("""
 Esta aplicación es una herramienta comunitaria para quienes habitamos el centro eco-pedagógico AUCCA.
-Nace de nuestra intención de construir un mejor día a día, reconociendo que el buen vivir también se cultiva
-en lo cotidiano: en el cuidado del espacio, de las relaciones, de las confianzas y de los acuerdos.
 """)
 
 # Función para cargar datos desde Google Sheets
@@ -85,7 +83,7 @@ seccion = st.selectbox("🌿 Explorar secciones", [
     "Videos y recursos",
     "Tareas semanerxs por zona",
     "Checklist de semanerx",
-    "🔗 Links claves"
+    "Links claves"
 ])
 
 if seccion == "":
@@ -102,6 +100,7 @@ if seccion == "":
         - **Acuerdos de comunicación externa**: cómo nos relacionamos con organizaciones, visitas y talleres.
         - **Videos y recursos**: materiales visuales de apoyo.
         - **Check List semanerxs**: sistema de registro de avances en actividades de semanerxs. 
+        - **Links claves**: repositorio de links claves sobre Aucca y lo que aquí ocurre. 
 
         Usa los menús desplegables arriba para explorar cada sección. 🌱
         """)
@@ -499,6 +498,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
