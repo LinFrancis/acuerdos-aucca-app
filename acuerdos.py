@@ -51,9 +51,8 @@ with top2:
     st.title("Acuerdos")
 
 st.caption("Corazón = Mente = Espíritu = Conciencia 👂🏾🧠🫀")
-st.markdown("""
-Esta aplicación es una herramienta comunitaria para quienes habitamos el centro eco-pedagógico AUCCA.
-""")
+st.caption(
+Esta aplicación es una herramienta comunitaria para quienes habitamos el centro eco-pedagógico AUCCA)
 
 # Función para cargar datos desde Google Sheets
 def cargar_datos(sheet_name):
@@ -78,9 +77,9 @@ if st.button("Actualizar Base de datos"):
 # Navegación principal sin sidebar
 seccion = st.selectbox("🌿 Explorar secciones", [
     "",
+    "Checklist de semanerx",
     "Acuerdos de convivencia (internos)",
     "Acuerdos Comunicación Externa",
-    "Checklist de semanerx",
     "Links claves"
 ])
 
@@ -91,12 +90,9 @@ if seccion == "":
     with colq2:
         st.markdown("""
         #### ¿Qué encontrarás aquí?
-        Esta aplicación contiene acuerdos y tareas organizadas por temas, zonas y tipo de convivencia.
 
-        - **Tareas semanerxs por zona**: responsabilidades de limpieza y mantenimiento profundo.
         - **Acuerdos de convivencia (internos)**: lo que hemos decidido como comunidad para convivir mejor.
         - **Acuerdos de comunicación externa**: cómo nos relacionamos con organizaciones, visitas y talleres.
-        - **Videos y recursos**: materiales visuales de apoyo.
         - **Check List semanerxs**: sistema de registro de avances en actividades de semanerxs. 
         - **Links claves**: repositorio de links claves sobre Aucca y lo que aquí ocurre. 
 
@@ -635,6 +631,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
