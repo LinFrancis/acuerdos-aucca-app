@@ -80,8 +80,6 @@ seccion = st.selectbox("🌿 Explorar secciones", [
     "",
     "Acuerdos de convivencia (internos)",
     "Acuerdos Comunicación Externa",
-    "Videos y recursos",
-    "Tareas semanerxs por zona",
     "Checklist de semanerx",
     "Links claves"
 ])
@@ -105,49 +103,195 @@ if seccion == "":
         Usa los menús desplegables arriba para explorar cada sección. 🌱
         """)
 
+
 elif seccion == "Links claves":
+    # --- mejoras de UI/UX para links claves ---
+    import datetime
+    from urllib.parse import urlparse
+
     df = cargar_datos("links")
-    df = df.rename(columns={
+
+    # Normalizar nombres de columnas (acepta variaciones)
+    rename_map = {
+        "Petalo": "Pétalo", "Pétalo": "Pétalo",
         "Tema": "Tema",
+        "Detalle": "Detalle",
+        "Tipo": "Tipo",
+        "Fecha creación": "Fecha creación", "Fecha creacion": "Fecha creación",
+        "Año": "Año", "Anio": "Año",
         "Nombre": "Nombre",
-        "Descripción": "Descripción",
-        "url": "URL"
-    })
-    temas = df["Tema"].unique()
-    ver_todo = st.checkbox("📋 Ver todos los enlaces")
-    
-    if ver_todo:
-        for tema in temas:
-            st.subheader(f"🔸 {tema}")
-            subset = df[df["Tema"] == tema]
-            for _, row in subset.iterrows():
-                st.markdown(f"**{row['Nombre']}**")
-                st.markdown(f"{row['Descripción']}")
-                st.markdown(f"[Abrir enlace]({row['URL']})")
+        "Descripción": "Descripción", "Descripcion": "Descripción",
+        "url": "URL", "Url": "URL", "URL": "URL",
+    }
+    df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+
+    # Asegurar columnas esperadas
+    expected_cols = ["Pétalo","Tema","Detalle","Tipo","Fecha creación","Año","Nombre","Descripción","URL"]
+    for c in expected_cols:
+        if c not in df.columns:
+            df[c] = ""
+
+    # Limpieza básica
+    for c in expected_cols:
+        df[c] = df[c].astype(str).str.strip()
+
+    # Unificar formato de Pétalo
+    df["Pétalo"] = df["Pétalo"].str.title()
+
+    # Parseo de Año
+    def _to_int(x):
+        try:
+            return int(float(str(x).strip()))
+        except:
+            return None
+    df["Año_int"] = df["Año"].apply(_to_int)
+
+    # Parseo de "Fecha creación" con meses en español (p.ej., "25 julio 2025")
+    meses = {
+        "enero":1,"febrero":2,"marzo":3,"abril":4,"mayo":5,"junio":6,
+        "julio":7,"agosto":8,"septiembre":9,"setiembre":9,"octubre":10,
+        "noviembre":11,"diciembre":12,
+    }
+    def _parse_fecha_es(s):
+        s = str(s).strip().lower()
+        if not s:
+            return None
+        parts = s.replace("de ", "").split()
+        # Formatos típicos: "25 julio 2025" / "2 marzo 2025"
+        try:
+            if len(parts) >= 3:
+                d = int(parts[0]); m = meses.get(parts[1]); y = int(parts[2])
+                if m:
+                    return datetime.datetime(y, m, d)
+        except:
+            pass
+        return None
+
+    df["Fecha_dt"] = df["Fecha creación"].apply(_parse_fecha_es)
+    # Si no hay fecha, usar 1-enero del año (si existe)
+    faltan_fecha = df["Fecha_dt"].isna() & df["Año_int"].notna()
+    df.loc[faltan_fecha, "Fecha_dt"] = df.loc[faltan_fecha, "Año_int"].apply(lambda y: datetime.datetime(y,1,1))
+
+    # Dominio del enlace (estético/informativo)
+    def _domain(u):
+        try:
+            d = urlparse(u).netloc
+            return d.replace("www.", "")
+        except:
+            return ""
+    df["Dominio"] = df["URL"].apply(_domain)
+
+    st.subheader("🔗 Links claves")
+
+    # —— Filtros + búsqueda
+    c0, c1, c2, c3, c4 = st.columns([2, 2, 2, 2, 2])
+    with c0:
+        q = st.text_input("Buscar", placeholder="Nombre o descripción...")
+    with c1:
+        petalos = ["(Todos)"] + sorted([x for x in df["Pétalo"].unique() if x])
+        f_petalo = st.selectbox("Pétalo", petalos, index=0)
+    with c2:
+        if f_petalo != "(Todos)":
+            temas_opts = ["(Todos)"] + sorted([x for x in df.loc[df["Pétalo"] == f_petalo, "Tema"].unique() if x])
+        else:
+            temas_opts = ["(Todos)"] + sorted([x for x in df["Tema"].unique() if x])
+        f_tema = st.selectbox("Tema", temas_opts, index=0)
+    with c3:
+        tipos_opts = sorted([x for x in df["Tipo"].unique() if x])
+        f_tipos = st.multiselect("Tipo", tipos_opts, default=[])
+    with c4:
+        anos_opts = sorted([int(x) for x in df["Año_int"].dropna().unique()], reverse=True)
+        f_anos = st.multiselect("Año", anos_opts, default=[])
+
+    # Aplicar filtros
+    dff = df.copy()
+    if q:
+        ql = q.lower()
+        dff = dff[dff["Nombre"].str.lower().str.contains(ql) | dff["Descripción"].str.lower().str.contains(ql)]
+    if f_petalo != "(Todos)":
+        dff = dff[dff["Pétalo"] == f_petalo]
+    if f_tema != "(Todos)":
+        dff = dff[dff["Tema"] == f_tema]
+    if f_tipos:
+        dff = dff[dff["Tipo"].isin(f_tipos)]
+    if f_anos:
+        dff = dff[dff["Año_int"].isin(f_anos)]
+
+    # Orden: primero por fecha (más nuevo), luego por año, luego por nombre
+    dff = dff.sort_values(["Fecha_dt", "Año_int", "Nombre"], ascending=[False, False, True], na_position="last")
+
+    ver_todo = st.checkbox("📋 Ver todos (agrupados por Tema)", value=False)
+
+    # —— Render helpers (definidos aquí para mantener el bloque autocontenible)
+    def _link_button(label, url):
+        # Usa link_button si está disponible; si no, link normal
+        try:
+            st.link_button(label, url, use_container_width=True)
+        except Exception:
+            st.markdown(f"[{label}]({url})")
+
+    def _render_card(row):
+        nombre = row["Nombre"] or "(Sin nombre)"
+        petalo = row["Pétalo"] or "—"
+        tema = row["Tema"] or "—"
+        detalle = row["Detalle"] or "—"
+        tipo = row["Tipo"] or "—"
+        anio = row["Año"] or ""
+        dominio = row["Dominio"] or ""
+        fecha_txt = ""
+        if isinstance(row["Fecha_dt"], datetime.datetime):
+            fecha_txt = row["Fecha_dt"].strftime("Creado el %d-%m-%Y")
+
+        st.markdown(f"#### {nombre}")
+        st.caption(f"{petalo} · {tema} · {detalle} · {tipo} · {anio}")
+        if fecha_txt:
+            st.caption(fecha_txt)
+        if row["Descripción"]:
+            st.markdown(row["Descripción"])
+        if row["URL"]:
+            _link_button("Abrir enlace", row["URL"])
+            if dominio:
+                st.caption(f"🌐 {dominio}")
+        else:
+            st.button("Sin URL", disabled=True, use_container_width=True)
+
+    def _render_cards_grid(gdf):
+        gdf = gdf.reset_index(drop=True)
+        for i in range(0, len(gdf), 3):
+            cols = st.columns(3)
+            for j, col in enumerate(cols):
+                if i + j >= len(gdf):
+                    break
+                with col:
+                    _render_card(gdf.iloc[i + j])
+
+    # —— Mostrar resultados
+    if dff.empty:
+        st.info("No hay enlaces que coincidan con los filtros.")
     else:
-        tema = st.selectbox("Selecciona un tema:", [""] + list(temas))
-        if tema:
-            subset = df[df["Tema"] == tema]
-            for _, row in subset.iterrows():
-                st.markdown(f"### 🔗 {row['Nombre']}")
-                st.markdown(f"{row['Descripción']}")
-                st.markdown(f"[Abrir enlace]({row['URL']})")
+        if ver_todo:
+            for tema_val, grupo in dff.groupby("Tema"):
+                st.subheader(f"🔸 {tema_val or '(Sin tema)'}")
+                _render_cards_grid(grupo)
+        else:
+            _render_cards_grid(dff.head(60))  # límite razonable para evitar scroll infinito
 
 
-elif seccion == "Tareas semanerxs por zona":
-    df = cargar_datos("tareas_semaneros")
-    df = df.rename(columns={
-        "Tema": "Área de responsabilidad semanal",
-        "Zona": "Elemento o espacio específico",
-        "Tarea": "Detalle de lo que debe realizarse"
-    })
-    temas = df['Área de responsabilidad semanal'].unique()
-    tema = st.selectbox("🌱 Selecciona un área de responsabilidad semanal:", [""] + list(temas))
-    if tema:
-        subset = df[df['Área de responsabilidad semanal'] == tema]
-        for _, row in subset.iterrows():
-            st.markdown(f"#### {row['Elemento o espacio específico']}")
-            st.markdown(f"{row['Detalle de lo que debe realizarse']}")
+
+# elif seccion == "Tareas semanerxs por zona":
+#     df = cargar_datos("tareas_semaneros")
+#     df = df.rename(columns={
+#         "Tema": "Área de responsabilidad semanal",
+#         "Zona": "Elemento o espacio específico",
+#         "Tarea": "Detalle de lo que debe realizarse"
+#     })
+#     temas = df['Área de responsabilidad semanal'].unique()
+#     tema = st.selectbox("🌱 Selecciona un área de responsabilidad semanal:", [""] + list(temas))
+#     if tema:
+#         subset = df[df['Área de responsabilidad semanal'] == tema]
+#         for _, row in subset.iterrows():
+#             st.markdown(f"#### {row['Elemento o espacio específico']}")
+#             st.markdown(f"{row['Detalle de lo que debe realizarse']}")
 
 
 
@@ -194,10 +338,6 @@ elif seccion == "Acuerdos Comunicación Externa":
         st.markdown(f"#### {row['Aspecto específico']}")
         st.markdown(f"{row['Detalle del acuerdo']}")
 
-elif seccion == "Videos y recursos":
-    st.subheader("🔌 Funcionamiento de la electricidad en AUCCA")
-    st.video("luz_solar_chalo.mp4")
-    st.markdown("Este video explica cómo funciona la electricidad solar en AUCCA. Pronto agregaremos nuevos videos para cada tema.")
 
 elif seccion == "Checklist de semanerx":
     inicio_semana = datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())
@@ -495,6 +635,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
