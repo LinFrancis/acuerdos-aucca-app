@@ -201,8 +201,38 @@ elif seccion == "Links claves":
     # Aplicar filtros
     dff = df.copy()
     if q:
-        ql = q.lower()
-        dff = dff[dff["Nombre"].str.lower().str.contains(ql) | dff["Descripción"].str.lower().str.contains(ql)]
+        ql = q.strip().lower()
+        import re
+        from difflib import SequenceMatcher
+    
+        def _approx_contains_text(s, ql, thr=0.8):
+            # Convierte a string y normaliza
+            s = "" if s is None else str(s)
+            s = s.lower()
+    
+            # 1) Coincidencia directa (substring)
+            if ql in s:
+                return True
+    
+            # 2) Coincidencia aproximada por tokens
+            tokens = re.findall(r"\w+", s)
+            if any(SequenceMatcher(None, ql, t).ratio() >= thr for t in tokens):
+                return True
+    
+            # 3) Coincidencia aproximada por ventana deslizante (frases)
+            L = len(ql)
+            if L >= 4 and len(s) >= L:
+                for i in range(len(s) - L + 1):
+                    frag = s[i:i+L]
+                    if SequenceMatcher(None, ql, frag).ratio() >= thr:
+                        return True
+    
+            return False
+
+    # Aplica búsqueda aproximada en TODAS las columnas y filtra filas con al menos 1 match
+    mask = dff.apply(lambda row: any(_approx_contains_text(v, ql) for v in row), axis=1)
+    dff = dff[mask]
+
     if f_petalo != "(Todos)":
         dff = dff[dff["Pétalo"] == f_petalo]
     if f_tema != "(Todos)":
@@ -630,6 +660,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
