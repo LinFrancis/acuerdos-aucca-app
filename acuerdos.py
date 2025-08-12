@@ -3,6 +3,8 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 import datetime
+import re
+from difflib import SequenceMatcher
 
 # Configuración inicial de la app
 st.set_page_config(page_title="Acuerdos Aucca", layout="wide")
@@ -43,6 +45,36 @@ hr {
 """
 st.markdown(eco_css, unsafe_allow_html=True)
 
+def _approx_contains_text(value, ql: str, thr: float = 0.8) -> bool:
+    """Búsqueda aproximada tolerante a errores de tipeo."""
+    try:
+        import pandas as pd  # por si el módulo se evalúa en otro archivo
+    except Exception:
+        pass
+
+    s = "" if value is None else str(value)
+    s = s.lower()
+
+    # 1) Substring directo
+    if ql in s:
+        return True
+
+    # 2) Aproximación por tokens (palabras)
+    tokens = re.findall(r"\w+", s)
+    for t in tokens:
+        if SequenceMatcher(None, ql, t).ratio() >= thr:
+            return True
+
+    # 3) Aproximación por ventana deslizante (frases)
+    L = len(ql)
+    if L >= 4 and len(s) >= L:
+        for i in range(len(s) - L + 1):
+            frag = s[i:i+L]
+            if SequenceMatcher(None, ql, frag).ratio() >= thr:
+                return True
+
+    return False
+
 # Mostrar logo y cabecera
 top1, top2 = st.columns([2, 9])
 with top1:
@@ -51,7 +83,7 @@ with top2:
     st.title("Acuerdos")
 
 st.caption("Corazón = Mente = Espíritu = Conciencia 👂🏾🧠🫀")
-st.caption("Esta aplicación es una herramienta comunitaria para quienes habitamos el centro eco-pedagógico AUCCA")
+# st.caption("Esta aplicación es una herramienta comunitaria para quienes habitamos el centro eco-pedagógico AUCCA")
 
 # Función para cargar datos desde Google Sheets
 def cargar_datos(sheet_name):
@@ -660,6 +692,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
