@@ -51,8 +51,7 @@ with top2:
     st.title("Acuerdos")
 
 st.caption("Corazón = Mente = Espíritu = Conciencia 👂🏾🧠🫀")
-st.caption(
-Esta aplicación es una herramienta comunitaria para quienes habitamos el centro eco-pedagógico AUCCA)
+st.caption("Esta aplicación es una herramienta comunitaria para quienes habitamos el centro eco-pedagógico AUCCA")
 
 # Función para cargar datos desde Google Sheets
 def cargar_datos(sheet_name):
@@ -631,6 +630,7 @@ elif seccion == "Checklist de semanerx":
 
             st.dataframe(resumen)
             st.caption("*Resumen de tareas completadas esta semana agrupadas por tema.*")
+
 
 
 
