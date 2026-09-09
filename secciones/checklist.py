@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import plotly.express as px
 import re  
 
-from data.google import cargar_datos, append_row
+from data.google import cargar_datos, append_row, invalidate_sheet
 
 # =========================
 # Config y constantes
@@ -364,11 +364,9 @@ def render():
         # Botón para borrar caché
         # -------------------------
         if st.button("Actualizar base de datos"):
-            st.cache_data.clear()
-            try:
-                st.cache_resource.clear()
-            except Exception:
-                pass
+            invalidate_sheet("tareas_semaneros")
+            invalidate_sheet("estado_tareas")
+            invalidate_sheet("mensajes_general")
             st.success("Base de datos actualizada ✅")
             st.rerun()
         
@@ -1012,19 +1010,22 @@ def render():
                                     st.error("La respuesta no puede estar vacía.")
                                 else:
                                     nuevo_id = int(df_msgs["ID"].max()) + 1 if not df_msgs.empty else 1
-                                    ahora = dt.datetime.now(tz=STGO)
-                                    append_row("mensajes_general", [
-                                        nuevo_id,
-                                        thread_id,  # mismo hilo
-                                        ahora.strftime("%Y-%m-%d %H:%M"),
-                                        nombre_resp,
-                                        respuesta.strip()
-                                    ])
-                                    st.cache_data.clear()
-                                    df_msgs = init_mensajes_general()
-                                    st.success("✅ Respuesta enviada")
-                                    st.session_state[f"show_form_{thread_id}"] = False
-                                    st.rerun()
+                                    ahora_msg = dt.datetime.now(tz=STGO)
+                                    try:
+                                        with st.spinner("Enviando respuesta..."):
+                                            append_row("mensajes_general", [
+                                                nuevo_id,
+                                                thread_id,  # mismo hilo
+                                                ahora_msg.strftime("%Y-%m-%d %H:%M"),
+                                                nombre_resp,
+                                                respuesta.strip()
+                                            ])
+                                        st.success("✅ Respuesta enviada")
+                                        st.session_state[f"show_form_{thread_id}"] = False
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error("⚠️ No se pudo enviar tu respuesta. Intenta de nuevo en unos segundos.")
+                                        st.exception(e)
 
            
            
@@ -1050,18 +1051,21 @@ def render():
                             st.error("El mensaje no puede estar vacío.")
                         else:
                             nuevo_id = int(df_msgs["ID"].max()) + 1 if not df_msgs.empty else 1
-                            ahora = dt.datetime.now(tz=STGO)
-                            append_row("mensajes_general", [
-                                nuevo_id,
-                                nuevo_id,  # ThreadID = ID propio
-                                ahora.strftime("%Y-%m-%d %H:%M"),
-                                nombre,
-                                mensaje.strip()
-                            ])
-                            st.cache_data.clear()
-                            df_msgs = init_mensajes_general()  # refrescar
-                            st.success("✅ Mensaje publicado")
-                            st.rerun()
+                            ahora_msg = dt.datetime.now(tz=STGO)
+                            try:
+                                with st.spinner("Publicando mensaje..."):
+                                    append_row("mensajes_general", [
+                                        nuevo_id,
+                                        nuevo_id,  # ThreadID = ID propio
+                                        ahora_msg.strftime("%Y-%m-%d %H:%M"),
+                                        nombre,
+                                        mensaje.strip()
+                                    ])
+                                st.success("✅ Mensaje publicado")
+                                st.rerun()
+                            except Exception as e:
+                                st.error("⚠️ No se pudo publicar tu mensaje. Intenta de nuevo en unos segundos.")
+                                st.exception(e)
         mensajes_generales()
 
 
@@ -1114,15 +1118,18 @@ def render():
                     obs_all = obs_all[obs_all["Tema"].isin(f_temas)]
 
                 # --- Semana (lunes) de cada fila
+                # Nota: restar el Timedelta ANTES de convertir a .dt.date (y no
+                # después) evita un TypeError con pandas recientes al operar
+                # un array de objetos `datetime.date` con un TimedeltaArray.
                 obs_all["week_start"] = (
-                    obs_all["Fecha_dt"].dt.date - pd.to_timedelta(obs_all["Fecha_dt"].dt.weekday, unit="D")
-                )
+                    obs_all["Fecha_dt"] - pd.to_timedelta(obs_all["Fecha_dt"].dt.weekday, unit="D")
+                ).dt.date
 
                 # --- Acumulado semanal por tarea
                 acc = dfe_all.copy()
                 acc["week_start"] = (
-                    acc["Fecha_dt"].dt.date - pd.to_timedelta(acc["Fecha_dt"].dt.weekday, unit="D")
-                )
+                    acc["Fecha_dt"] - pd.to_timedelta(acc["Fecha_dt"].dt.weekday, unit="D")
+                ).dt.date
                 acc_grp = (
                     acc.groupby(["week_start", "Tema", "Zona", "Tarea"], dropna=False)["Porcentaje"]
                     .sum().clip(upper=100).rename("acum_semana")
@@ -1461,26 +1468,28 @@ def render():
                     fecha_sel = pd.to_datetime(fecha_registro).strftime("%Y-%m-%d")
                     hora_sel = ahora.strftime("%H:%M")
 
-                    append_row("estado_tareas", [
-                        f"{fecha_sel} {hora_sel}",
-                        nombre,
-                        tema,
-                        row["Zona"],
-                        row["Tarea"],
-                        estado,
-                        porc,
-                        (obs_txt or "").strip()
-                    ])
-
                     try:
-                        st.cache_data.clear()
-                    except Exception:
-                        pass
-
-                    st.success(f"✅ Registrado: {row['Zona']} · {row['Tarea']} (+{porc}%)")
-                    st.session_state["tab_idx"] = TAB_LABELS.index("✅ Registrar avance")
-                    st.session_state["nombre_sel"] = nombre
-                    st.rerun()
+                        with st.spinner("Guardando avance..."):
+                            append_row("estado_tareas", [
+                                f"{fecha_sel} {hora_sel}",
+                                nombre,
+                                tema,
+                                row["Zona"],
+                                row["Tarea"],
+                                estado,
+                                porc,
+                                (obs_txt or "").strip()
+                            ])
+                        st.success(f"✅ Registrado: {row['Zona']} · {row['Tarea']} (+{porc}%)")
+                        st.session_state["tab_idx"] = TAB_LABELS.index("✅ Registrar avance")
+                        st.session_state["nombre_sel"] = nombre
+                        st.rerun()
+                    except Exception as e:
+                        st.error(
+                            "⚠️ No se pudo guardar tu avance (problema de conexión con Google Sheets). "
+                            "Tus datos siguen en el formulario, intenta nuevamente en unos segundos."
+                        )
+                        st.exception(e)
 
                 # =========================
                 # Render por tema/tarea

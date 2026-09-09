@@ -5,34 +5,27 @@ import pandas as pd
 import datetime as dt
 from zoneinfo import ZoneInfo
 import gspread
-from google.oauth2.service_account import Credentials
+
+from data.google import get_worksheet, with_retry
 
 # =========================
 # Configuración general
 # =========================
 STGO = ZoneInfo("America/Santiago")
-SPREADSHEET_KEY = "1C8njkp0RQMdXnxuJvPvfK_pNZHQSi7q7dUPeUg-2624"
 HOJA = "finanzas"
 
 AUCCANES = ["🚴🏻Chalo", "🌿Camilú", "⚽Niko", "🍃Diego", "🪈Francis", "🌌Tais", "🌊Cala"]
 
 # =========================
 # Helpers de conexión
+# - Reutiliza el cliente/spreadsheet cacheado de data.google (evita
+#   reautenticar contra Google en cada llamada) y agrega reintentos ante
+#   errores transitorios (cuota, 5xx) vía with_retry.
 # =========================
 def _a1_range_row(row: int, ncols: int) -> str:
     last_cell = gspread.utils.rowcol_to_a1(row, ncols)
     last_col = re.sub(r"\d+", "", last_cell)
     return f"A{row}:{last_col}{row}"
-
-def _open_ws(sheet_name=HOJA):
-    creds = Credentials.from_service_account_info(
-        st.secrets["gspread"],
-        scopes=["https://spreadsheets.google.com/feeds",
-                "https://www.googleapis.com/auth/drive"],
-    )
-    client = gspread.authorize(creds)
-    sh = client.open_by_key(SPREADSHEET_KEY)
-    return sh.worksheet(sheet_name)
 
 EXPECTED_HEADERS = [
     "ID","Tipo","Detalle","Categoría","Fecha","Persona",
@@ -41,12 +34,12 @@ EXPECTED_HEADERS = [
 ]
 
 def _ensure_sheet_headers(ws) -> list[str]:
-    headers_raw = ws.row_values(1)
+    headers_raw = with_retry(lambda: ws.row_values(1))
     headers = [h.strip() for h in headers_raw]
     missing = [h for h in EXPECTED_HEADERS if h not in headers]
     if missing:
         new_headers = headers + missing
-        ws.update(_a1_range_row(1, len(new_headers)), [new_headers])
+        with_retry(lambda: ws.update(_a1_range_row(1, len(new_headers)), [new_headers]))
         return new_headers
     return headers
 
@@ -64,11 +57,12 @@ def _parse_fecha_any(s) -> pd.Timestamp:
         return pd.to_datetime(s, format="%Y-%m-%d", errors="coerce")
     return pd.to_datetime(s, dayfirst=True, errors="coerce")
 
+@st.cache_data(ttl=300)
 def _load_finanzas_df() -> pd.DataFrame:
     try:
-        ws = _open_ws(HOJA)
+        ws = get_worksheet(HOJA)
         headers = _ensure_sheet_headers(ws)
-        values = ws.get_all_values()
+        values = with_retry(lambda: ws.get_all_values())
     except Exception as e:
         st.error(f"No se pudo leer la hoja '{HOJA}': {e}")
         return pd.DataFrame(columns=EXPECTED_HEADERS)
@@ -531,11 +525,17 @@ def _form_traspaso():
                     "Last_Modified_By": "",
                     "Anulado": ""
                 }
-                ws = _open_ws(HOJA)
-                headers = _ensure_sheet_headers(ws)
-                row_out = [record.get(h,"") for h in headers]
-                ws.append_row(row_out, value_input_option="USER_ENTERED")
-                st.success(f"🔄 Traspaso {origen} → {destino} registrado")
+                try:
+                    with st.spinner("Guardando traspaso..."):
+                        ws = get_worksheet(HOJA)
+                        headers = _ensure_sheet_headers(ws)
+                        row_out = [record.get(h,"") for h in headers]
+                        with_retry(lambda: ws.append_row(row_out, value_input_option="USER_ENTERED"))
+                        _load_finanzas_df.clear()
+                    st.success(f"🔄 Traspaso {origen} → {destino} registrado")
+                except Exception as e:
+                    st.error("⚠️ No se pudo guardar el traspaso. Intenta de nuevo en unos segundos.")
+                    st.exception(e)
            
 
 def _form_registro(cats_existentes: list[str]):
@@ -583,55 +583,28 @@ def _form_editar_anular(df: pd.DataFrame):
         row = df_view[df_view["Opción"] == opcion].iloc[0]
         tipo = row["Tipo"]
 
-        # Inicializar categoria_activa_edit en session_state
-        if "categoria_activa_edit" not in st.session_state:
-            st.session_state["categoria_activa_edit"] = row["Categoría"]
-
-        def _on_edit_cat_sel():
-            val = st.session_state.get("edit_cat_exist", "")
-            if val:
-                st.session_state["categoria_activa_edit"] = val
-
-        def _on_edit_cat_nueva():
-            val = st.session_state.get("edit_txt_new_cat", "").strip()
-            if val:
-                st.session_state["categoria_activa_edit"] = val
-
         st.markdown("---")
         st.markdown(f"#### 🛠️ Editando registro actual")
 
-        # --- Selector de categoría (solo para Ingreso/Gasto) ---
-        if tipo in ["Ingreso","Gasto"]:
-            col1, col2 = st.columns([3,1])
-            with col1:
-                cats_existentes = sorted({c for c in df["Categoría"].unique() if str(c).strip()})
-                idx_edit = (cats_existentes.index(row["Categoría"]) + 1) if row["Categoría"] in cats_existentes else 0
-                st.selectbox(
-                    "📂 Categoría",
-                    [""] + cats_existentes,
-                    index=idx_edit,
-                    key="edit_cat_exist",
-                    on_change=_on_edit_cat_sel,
-                )
-            with col2:
-                st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
-                try:
-                    with st.popover("➕ Nueva", use_container_width=True):
-                        st.text_input("Nombre de etiqueta rápida", key="edit_txt_new_cat", on_change=_on_edit_cat_nueva)
-                except AttributeError:
-                    st.text_input("➕ Nueva etiqueta", key="edit_txt_new_cat", on_change=_on_edit_cat_nueva)
+        cats_existentes = sorted({c for c in df["Categoría"].unique() if str(c).strip()})
 
-            # Mostrar categoría activa actual
-            if st.session_state.get("categoria_activa_edit"):
-                st.info(f"📌 Categoría asignada: **{st.session_state['categoria_activa_edit']}**")
-
-        # --- Formulario principal ---
+        # --- Formulario principal (categoría incluida: todo se confirma junto
+        # al enviar, sin reruns intermedios que antes daban sensación de "se
+        # reinicia" al tocar la categoría). ---
         with st.form("form_editar"):
             fecha_val = row["Fecha_dt"].date() if pd.notnull(row["Fecha_dt"]) else dt.date.today()
-            
+
             # Tipo editable solo para ingresos/gastos
             if tipo in ["Ingreso","Gasto"]:
                 tipo_editado = st.selectbox("📄 Tipo", ["Ingreso","Gasto"], index=0 if tipo=="Ingreso" else 1, key="edit_tipo")
+
+                col1, col2 = st.columns([3,2])
+                with col1:
+                    idx_edit = (cats_existentes.index(row["Categoría"]) + 1) if row["Categoría"] in cats_existentes else 0
+                    cat_existente = st.selectbox("📂 Categoría", [""] + cats_existentes, index=idx_edit, key="edit_cat_exist")
+                with col2:
+                    cat_nueva = st.text_input("…o escribe una nueva", key="edit_txt_new_cat", placeholder="Nueva etiqueta")
+
                 colA, colB = st.columns(2)
                 with colA:
                     fecha = st.date_input("🗓️ Fecha", value=fecha_val, max_value=max(fecha_val, dt.date.today()))
@@ -650,12 +623,12 @@ def _form_editar_anular(df: pd.DataFrame):
                 with col2:
                     destino = st.selectbox("📥 Recibe", AUCCANES, index=AUCCANES.index(row["Persona_Destino"]) if row["Persona_Destino"] in AUCCANES else 0, key="edit_destino")
                     fecha = st.date_input("🗓️ Fecha", value=fecha_val, max_value=max(fecha_val, dt.date.today()))
-                
+
                 detalle = st.text_input("📝 Detalle", row["Detalle"], key="edit_detalle_t")
 
             st.markdown("---")
             editor = st.selectbox("🕵️‍♂️ ¿Quién autoriza los cambios?", [""] + AUCCANES, key="edit_editor")
-            
+
             st.markdown("<br>", unsafe_allow_html=True)
             colX, colY = st.columns(2)
             with colX:
@@ -669,9 +642,6 @@ def _form_editar_anular(df: pd.DataFrame):
         return
 
     if guardar or anular:
-        ws = _open_ws(HOJA)
-        headers = _ensure_sheet_headers(ws)
-        rownum = int(row["_row"])
         valores = row.to_dict()
 
         if anular:
@@ -684,7 +654,8 @@ def _form_editar_anular(df: pd.DataFrame):
             if tipo_editado in ["Ingreso","Gasto"]:
                 valores["Tipo"] = tipo_editado
                 valores["Persona"] = persona
-                valores["Categoría"] = st.session_state["categoria_activa_edit"].strip()
+                categoria_final = (cat_nueva or "").strip() or (cat_existente or "").strip()
+                valores["Categoría"] = categoria_final
             elif tipo_editado == "Traspaso":
                 valores["Persona_Origen"] = origen
                 valores["Persona_Destino"] = destino
@@ -693,60 +664,53 @@ def _form_editar_anular(df: pd.DataFrame):
             valores["Last_Modified_At"] = now.strftime("%Y-%m-%d %H:%M:%S")
             valores["Last_Modified_By"] = editor
 
-        row_out = [valores.get(h,"") for h in headers]
-        ws.update(_a1_range_row(rownum, len(headers)), [row_out], value_input_option="USER_ENTERED")
+        try:
+            with st.spinner("Guardando cambios..."):
+                ws = get_worksheet(HOJA)
+                headers = _ensure_sheet_headers(ws)
+                rownum = int(row["_row"])
+                row_out = [valores.get(h,"") for h in headers]
+                with_retry(lambda: ws.update(_a1_range_row(rownum, len(headers)), [row_out], value_input_option="USER_ENTERED"))
+                _load_finanzas_df.clear()
 
-        if anular:
-            st.success(f"🗑️ Movimiento anulado por {editor}.")
-        else:
-            st.success(f"✅ Cambios guardados por {editor}.")
-        st.rerun()
+            if anular:
+                st.success(f"🗑️ Movimiento anulado por {editor}.")
+            else:
+                st.success(f"✅ Cambios guardados por {editor}.")
+            st.rerun()
+        except Exception as e:
+            st.error("⚠️ No se pudo guardar el cambio. Intenta de nuevo en unos segundos.")
+            st.exception(e)
        
 
 def _form_ingreso_gasto(tipo: str, cats_existentes: list[str]):
-    """Formulario para registrar ingresos o gastos"""
-    key_cat = f"categoria_activa_{tipo}"
-    if key_cat not in st.session_state:
-        st.session_state[key_cat] = ""
+    """Formulario para registrar ingresos o gastos.
 
-    def _on_cat_sel():
-        val = st.session_state.get(f"cat_exist_{tipo}", "")
-        if val:
-            st.session_state[key_cat] = val
-
-    def _on_cat_nueva():
-        val = st.session_state.get(f"txt_new_cat_{tipo}", "").strip()
-        if val:
-            st.session_state[key_cat] = val
-
+    La categoría (existente o nueva) vive DENTRO del mismo st.form que el
+    resto de los campos: antes estaba fuera y cada clic en el selector
+    disparaba un rerun completo de la app antes de poder terminar de llenar
+    el formulario, lo que se sentía como que "se reiniciaba". Ahora todo se
+    confirma junto, en un solo envío.
+    """
     with st.container(border=True):
-        st.markdown(f"#### 📂 Etiquetado de {tipo}")
+        st.markdown(f"#### 📂 Registrar {tipo}")
 
-        col1, col2 = st.columns([3,1])
-        with col1:
-            st.selectbox(
-                "Tópico general",
-                [""] + sorted({c for c in cats_existentes if c}),
-                index=0,
-                key=f"cat_exist_{tipo}",
-                on_change=_on_cat_sel,
-            )
-        with col2:
-            st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
-            try:
-                with st.popover("➕ Crear", use_container_width=True):
-                    st.text_input("Nombre descriptivo", key=f"txt_new_cat_{tipo}", on_change=_on_cat_nueva)
-            except AttributeError:
-                st.text_input("➕ Nueva", key=f"txt_new_cat_{tipo}", on_change=_on_cat_nueva)
-
-        # Mostrar categoría activa actual
-        if st.session_state[key_cat]:
-            st.success(f"📌 Etiqueta activa: **{st.session_state[key_cat]}**")
-
-        st.markdown("---")
-
-        # Formulario principal
         with st.form(f"form_{tipo.lower()}", clear_on_submit=True):
+            col1, col2 = st.columns([3,2])
+            with col1:
+                cat_existente = st.selectbox(
+                    "Tópico general",
+                    [""] + sorted({c for c in cats_existentes if c}),
+                    index=0,
+                    key=f"cat_exist_{tipo}",
+                )
+            with col2:
+                cat_nueva = st.text_input(
+                    "…o escribe una etiqueta nueva",
+                    key=f"txt_new_cat_{tipo}",
+                    placeholder="Ej: Arriendo, Comida...",
+                )
+
             colA, colB = st.columns(2)
             with colA:
                 fecha = st.date_input("🗓️ Fecha de caja", value=dt.date.today(), max_value=dt.date.today())
@@ -757,9 +721,9 @@ def _form_ingreso_gasto(tipo: str, cats_existentes: list[str]):
 
             st.markdown("<br>", unsafe_allow_html=True)
             submit = st.form_submit_button(f"🚀 Procesar {tipo}", type="primary", use_container_width=True)
-            
+
             if submit:
-                categoria_final = st.session_state.get(key_cat, "").strip()
+                categoria_final = (cat_nueva or "").strip() or (cat_existente or "").strip()
                 if persona and categoria_final and monto > 0 and len(detalle.strip()) >= 5:
                     now = pd.Timestamp.now(tz=STGO)
                     record = {
@@ -778,12 +742,17 @@ def _form_ingreso_gasto(tipo: str, cats_existentes: list[str]):
                         "Last_Modified_By": "",
                         "Anulado": ""
                     }
-                    ws = _open_ws(HOJA)
-                    headers = _ensure_sheet_headers(ws)
-                    row_out = [record.get(h,"") for h in headers]
-                    ws.append_row(row_out, value_input_option="USER_ENTERED")
-                    st.success(f"✅ {tipo} registrado correctamente.")
-                    st.session_state[key_cat] = ""  # reset después de guardar
+                    try:
+                        with st.spinner("Guardando..."):
+                            ws = get_worksheet(HOJA)
+                            headers = _ensure_sheet_headers(ws)
+                            row_out = [record.get(h,"") for h in headers]
+                            with_retry(lambda: ws.append_row(row_out, value_input_option="USER_ENTERED"))
+                            _load_finanzas_df.clear()
+                        st.success(f"✅ {tipo} registrado correctamente.")
+                    except Exception as e:
+                        st.error("⚠️ No se pudo guardar. Intenta de nuevo en unos segundos.")
+                        st.exception(e)
                 else:
                     st.error("⚠️ Debes completar todos los campos obligatorios y asignar una etiqueta.")
 
@@ -797,9 +766,7 @@ def render():
         st.markdown("## Finanzas")
     with col2:
         if st.button("🔄 Actualizar BD", key="actualizardb"):
-            st.cache_data.clear()
-            try: st.cache_resource.clear()
-            except: pass
+            _load_finanzas_df.clear()
             st.success("BD actualizada ✅")
             st.rerun()
 
@@ -831,9 +798,7 @@ def render():
         if modo == "Registrar":
             _form_registro(cats_existentes)
             if st.button("Agregar nuevo registro", key="actualizardb2"):
-                st.cache_data.clear()
-                try: st.cache_resource.clear()
-                except: pass
+                _load_finanzas_df.clear()
                 st.success("Ya puede proceder ✅")
                 st.rerun()
         else:

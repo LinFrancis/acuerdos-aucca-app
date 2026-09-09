@@ -259,9 +259,13 @@ SECTIONS = [
     {"slug": "acuerdos",  "label": "Acuerdos"},
 ]
 
+SLUGS = [s["slug"] for s in SECTIONS]
+LABELS = [s["label"] for s in SECTIONS]
+SLUG_BY_LABEL = {s["label"]: s["slug"] for s in SECTIONS}
+LABEL_BY_SLUG = {s["slug"]: s["label"] for s in SECTIONS}
+
 # ----------------------------
 # Deep link: ?section=slug
-# - Reordenamos las tabs para que la solicitada quede primera (aparece seleccionada)
 # ----------------------------
 def _get_query_section():
     # Streamlit recientes: st.query_params (>=1.30); fallback a experimental
@@ -276,13 +280,36 @@ def _get_query_section():
     return sec
 
 section_q = _get_query_section()
-if section_q and any(s["slug"] == section_q for s in SECTIONS):
-    SECTIONS = sorted(SECTIONS, key=lambda s: 0 if s["slug"] == section_q else 1)
 
 # ----------------------------
-# Tabs
+# Navegación por secciones
+# - Solo la sección activa se renderiza en cada ejecución. `st.tabs` de
+#   Streamlit computa el contenido de TODAS las pestañas en cada rerun aunque
+#   solo una sea visible; con 5 secciones (varias con lecturas a Google Sheets
+#   y gráficos) eso volvía lenta y poco fluida cualquier interacción en
+#   cualquier parte de la app. Este selector evita ese costo: solo se ejecuta
+#   el render() de la sección elegida.
 # ----------------------------
-tabs = st.tabs([s["label"] for s in SECTIONS])
+if "active_section" not in st.session_state:
+    st.session_state["active_section"] = section_q if section_q in SLUGS else SLUGS[0]
+
+default_label = LABEL_BY_SLUG.get(st.session_state["active_section"], LABELS[0])
+
+try:
+    selected_label = st.pills("Navegación", LABELS, default=default_label, key="nav_pills")
+    if not selected_label:
+        selected_label = default_label
+except AttributeError:
+    idx_default = LABELS.index(default_label) if default_label in LABELS else 0
+    selected_label = st.radio("Navegación", LABELS, index=idx_default, horizontal=True, key="nav_radio")
+
+selected_slug = SLUG_BY_LABEL.get(selected_label, SLUGS[0])
+st.session_state["active_section"] = selected_slug
+
+try:
+    st.query_params["section"] = selected_slug
+except Exception:
+    pass
 
 # ----------------------------
 # Inline SVG íconos por sección (no emojis)
@@ -352,9 +379,7 @@ def _safe_render(section_slug: str):
         st.exception(e)
 
 # ----------------------------
-# Colocar contenido en cada tab (en el orden actual)
-# Nota: el deep link solo define la tab que aparece seleccionada al cargar.
+# Render de la sección activa (única)
 # ----------------------------
-for tab, sec in zip(tabs, SECTIONS):
-    with tab:
-        _safe_render(sec["slug"])
+st.markdown("---")
+_safe_render(selected_slug)
