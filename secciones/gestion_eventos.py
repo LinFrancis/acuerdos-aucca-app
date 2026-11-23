@@ -131,9 +131,7 @@ def render():
     df_eventos = _load_evt_df("evt_eventos")
     eventos_abiertos = df_eventos[df_eventos["Estado"] == "Abierto"] if not df_eventos.empty else pd.DataFrame()
 
-    with st.sidebar:
-        st.markdown("---")
-        with st.expander("➕ Crear Nuevo Evento", expanded=False):
+    if st.toggle("➕ Crear nuevo evento", key="evt_crear_tog"):
             with st.form("form_nuevo_evento"):
                 nombre_ev   = st.text_input("Nombre del Evento")
                 tipo_ev     = st.selectbox("Tipo", ["Evento / Fiesta", "Almuerzo / Cena", "Visita", "Taller"])
@@ -175,7 +173,7 @@ def render():
         st.session_state["evento_activo_id"] = seleccion
         st.rerun()
     if not seleccion:
-        st.info("👈 Selecciona o crea un evento para comenzar.")
+        st.info("Selecciona un evento arriba, o crea uno nuevo, para comenzar.")
         return
 
     evento_sel_data = df_eventos[df_eventos["ID"] == seleccion].iloc[0]

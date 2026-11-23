@@ -213,6 +213,60 @@ hr { border-color: #E6D9FF !important; }
   font-weight: 700 !important;
   color: #7B4F9E !important;
 }
+
+/* ===== Celular (solo pantallas angostas; el escritorio no cambia) ===== */
+@media (max-width: 640px) {
+  .block-container { padding: 1rem 0.75rem 3rem !important; }
+  .aucca-banner { padding: 0.75rem 1rem; gap: 0.75rem; margin: 0.25rem 0 1rem; border-radius: 14px; }
+  .aucca-banner img { width: 46px; height: 46px; }
+  .aucca-banner h1 { font-size: 1.15rem !important; line-height: 1.2 !important; }
+  h1 { font-size: 1.6rem !important; }
+  h2 { font-size: 1.35rem !important; }
+  h3 { font-size: 1.15rem !important; }
+  h4 { font-size: 1.05rem !important; }
+  [data-testid="stMetricValue"] { font-size: 1.3rem !important; }
+  [data-testid="stMetricLabel"] p { font-size: 0.8rem !important; }
+
+  /* Barras de navegación: una sola fila que se desliza con el dedo */
+  [data-testid="stButtonGroup"] > div,
+  .st-key-coop_sec [role="radiogroup"],
+  [class*="st-key-tab_evt_"] [role="radiogroup"] {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 6px;
+  }
+  [data-testid="stButtonGroup"] > div::-webkit-scrollbar,
+  .st-key-coop_sec [role="radiogroup"]::-webkit-scrollbar,
+  [class*="st-key-tab_evt_"] [role="radiogroup"]::-webkit-scrollbar { display: none; }
+  [data-testid="stButtonGroup"] > div > *,
+  .st-key-coop_sec [role="radiogroup"] > label,
+  [class*="st-key-tab_evt_"] [role="radiogroup"] > label {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+  /* Las pestañas de la barra principal se ven como botones fáciles de tocar */
+  .st-key-coop_sec [role="radiogroup"] > label,
+  [class*="st-key-tab_evt_"] [role="radiogroup"] > label {
+    border: 1px solid #CDB4FF; border-radius: 999px; padding: 4px 12px; background: #FFFFFF; margin-right: 6px;
+  }
+  .st-key-coop_sec [role="radiogroup"] > label:has(input:checked),
+  [class*="st-key-tab_evt_"] [role="radiogroup"] > label:has(input:checked) {
+    background: #B497E7; border-color: #B497E7;
+  }
+  .st-key-coop_sec [role="radiogroup"] > label:has(input:checked) p,
+  [class*="st-key-tab_evt_"] [role="radiogroup"] > label:has(input:checked) p { color: #FFFFFF !important; }
+  .st-key-coop_sec [data-testid="stRadioOption"] > div > div > div:first-child:not([data-testid="stMarkdownContainer"]),
+  [class*="st-key-tab_evt_"] [data-testid="stRadioOption"] > div > div > div:first-child:not([data-testid="stMarkdownContainer"]) { display: none !important; }
+
+  /* Columnas: dos por fila en vez de una larguísima pila */
+  [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.5rem !important; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    min-width: calc(50% - 0.5rem) !important; flex: 1 1 calc(50% - 0.5rem) !important;
+  }
+  .stButton button, [data-testid="stFormSubmitButton"] button { min-height: 2.75rem; }
+}
 </style>
 """
 st.markdown(ECO_CSS, unsafe_allow_html=True)
@@ -257,8 +311,8 @@ SECTIONS = [
     {"slug": "finanzas",  "label": "Finanzas"},
     {"slug": "links",     "label": "Links claves"},
     {"slug": "acuerdos",  "label": "Acuerdos"},
-    {"slug": "eventos",   "label": "Eventos"},
     {"slug": "cooperativa", "label": "Cooperativa de Trabajo"},
+    {"slug": "eventos",   "label": "Eventos"},
 ]
 
 SLUGS = [s["slug"] for s in SECTIONS]
@@ -387,6 +441,24 @@ def _safe_render(section_slug: str):
         # Panel de diagnóstico: no rompe toda la app
         st.error("No se pudo renderizar esta sección. Revisa el detalle abajo.")
         st.exception(e)
+
+# ----------------------------
+# Celular: dejar visible la pestaña activa en las barras que se deslizan
+# ----------------------------
+try:
+    import streamlit.components.v1 as _components
+    _components.html(
+        """<script>
+        const d = window.parent.document;
+        const ir = () => d.querySelectorAll(
+          '[data-testid="stButtonGroup"] button[aria-checked="true"],'
+          + '.st-key-coop_sec label:has(input:checked),'
+          + '[class*="st-key-tab_evt_"] label:has(input:checked)'
+        ).forEach(e => e.scrollIntoView({inline: "center", block: "nearest"}));
+        setTimeout(ir, 200); setTimeout(ir, 900);
+        </script>""", height=0)
+except Exception:
+    pass
 
 # ----------------------------
 # Render de la sección activa (única)
