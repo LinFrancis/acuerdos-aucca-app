@@ -257,6 +257,8 @@ SECTIONS = [
     {"slug": "finanzas",  "label": "Finanzas"},
     {"slug": "links",     "label": "Links claves"},
     {"slug": "acuerdos",  "label": "Acuerdos"},
+    {"slug": "eventos",   "label": "Eventos"},
+    {"slug": "cooperativa", "label": "Cooperativa de Trabajo"},
 ]
 
 SLUGS = [s["slug"] for s in SECTIONS]
@@ -370,6 +372,14 @@ def _safe_render(section_slug: str):
             from secciones.finanzas_aucca import render as render_finanzas
             #st.markdown(f'<div class="section-title">{ICONS["finanzas"]}<h3>Finanzas</h3></div>', unsafe_allow_html=True)
             render_finanzas()
+
+        elif section_slug == "eventos":
+            from secciones.gestion_eventos import render as render_eventos
+            render_eventos()
+
+        elif section_slug == "cooperativa":
+            from secciones.cooperativa import render as render_cooperativa
+            render_cooperativa()
 
         else:
             st.warning("Sección no reconocida.")

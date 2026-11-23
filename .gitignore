@@ -15,3 +15,7 @@ secrets.toml
 
 # Streamlit deployment logs
 .streamlit/logs/
+
+# Datos locales de prueba de la cooperativa
+data/local_coop/
+.pytest_cache/

@@ -45,3 +45,28 @@ acuerdos_app/
 - El `SHEET_KEY` está en `data/google.py`. Si cambia, actualízalo allí.
 - Puedes crear más temas/estilos en `ui/` y cambiar el import en `acuerdos.py`.
 - Cada sección expone `render()` para mantener el router súper simple.
+
+## Pestañas nuevas
+
+### Eventos (`secciones/gestion_eventos.py`)
+Punto de venta y cierre de eventos. **No lee ni escribe la hoja `finanzas`**: al cerrar un evento solo informa cuánto debe ingresarse *manualmente* como dinero de AUCCA. Usa las hojas `evt_*`.
+
+### Cooperativa de Trabajo (`secciones/cooperativa.py`)
+Proyectos con oferta (servicios y productos), ventas, producción, costos y horas; reparto del dinero con 6 métodos comparables (A–F); escenarios de parámetros; planificación de actividades futuras; pagos y fondos del proyecto (separados de AUCCA); perfiles; círculos, acuerdos y tensiones; manual.
+
+```
+secciones/coop_motor.py    # cálculos (sin Streamlit; con tests)
+secciones/coop_datos.py    # Google Sheets (hojas coop_*) o archivo local si no hay credenciales
+secciones/coop_ejemplo.py  # datos de ejemplo del viernes 13 de nov (SIMULADOS)
+secciones/cooperativa.py   # pantallas
+docs/                      # manual, supuestos y fórmulas, reglamento borrador, notas legales
+tests/test_coop_motor.py   # pytest
+```
+
+Hojas que se crean solas en el Google Sheet: `coop_proyectos`, `coop_items`, `coop_ventas`, `coop_produccion`, `coop_costos`, `coop_registro`, `coop_personas`, `coop_parametros`, `coop_pagos`, `coop_fondos`, `coop_gobernanza`.
+
+Probar sin credenciales (guarda en `data/local_coop/`, ignorado por git):
+```bash
+streamlit run acuerdos.py
+python -m pytest tests -q
+```
