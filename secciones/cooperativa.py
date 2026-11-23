@@ -103,10 +103,25 @@ def _selector_escenario(pid: str, key: str, proyecto: dict) -> tuple[str, dict, 
     return eid, _params_de(eid), estado
 
 
-def _aviso_simulado(res: dict, proyecto: dict) -> None:
-    if res["resumen"].get("simulado") or _bool(proyecto.get("Simulado")):
-        st.warning("**Datos simulados.** Parte de las horas, costos, ventas o tarifas son de ejemplo. "
-                   "Reemplázalos en «Registro» y «Personas» con los datos reales antes de pagar.")
+def _pendientes(pid: str) -> dict:
+    """Cuenta los datos que aún son estimaciones («por confirmar») en el proyecto."""
+    def n(tabla):
+        df = D.cargar_proyecto(tabla, pid)
+        return int(df["PorConfirmar"].map(_bool).sum()) if "PorConfirmar" in df else 0
+    reg = D.cargar_proyecto("coop_registro", pid)
+    per = D.cargar("coop_personas")
+    return {"horas": int(reg["Origen"].str.lower().str.startswith(("sim", "estim")).sum()),
+            "ventas": n("coop_ventas"), "producción": n("coop_produccion"), "costos": n("coop_costos"),
+            "tarifas de personas": int(per["PorConfirmar"].map(_bool).sum())}
+
+
+def _aviso_por_confirmar(pid: str) -> None:
+    pend = {k: v for k, v in _pendientes(pid).items() if v}
+    if pend:
+        detalle = ", ".join(f"{v} de {k}" for k, v in pend.items())
+        st.warning(f"**Hay datos por confirmar** ({detalle}). Los montos de esta pantalla son estimaciones y cambiarán "
+                   "cuando cada persona confirme lo suyo. Conviene no pagar antes de confirmarlos. "
+                   "Se corrigen en «Registro» y «Personas».")
 
 
 # ----------------------------------------------------- editores de tabla
@@ -187,7 +202,7 @@ def _nuevo_proyecto() -> None:
                     D.guardar_fila("coop_proyectos", {
                         "ID": pid, "Nombre": nombre.strip(), "Tipo": tipo, "Fecha": str(fecha), "Estado": "Diseño",
                         "Cliente": cliente, "Asistentes": asistentes, "IVA": iva, "Descripcion": desc,
-                        "Simulado": "FALSE", "Escenario": ""})
+                        "Escenario": ""})
                     if copiar:
                         src = proy[proy["Nombre"] == copiar]["ID"].iloc[0]
                         _copiar_oferta(src, pid, asistentes or None, 1.0)
@@ -213,13 +228,14 @@ def _copiar_oferta(origen: str, destino: str, asistentes, escala: float) -> None
     cost = D.cargar_proyecto("coop_costos", origen).copy()
     cost["ID"] = ""
     cost["ItemID"] = cost["ItemID"].map(lambda i: nuevo_map.get(i, ""))
-    cost["PagadoPor"], cost["Reembolsado"], cost["Simulado"] = "", "FALSE", "TRUE"
+    cost["PagadoPor"], cost["Reembolsado"], cost["PorConfirmar"] = "", "FALSE", "TRUE"
     D.guardar_proyecto("coop_costos", destino, cost, "c")
 
 
-def _sec_proyecto(pid: str) -> None:
+def _sec_resumen(pid: str) -> None:
     p = _fila_proyecto(pid)
-    st.markdown("### Perfil del proyecto")
+    st.markdown(f"### {p['Nombre']}")
+    st.caption(f"{p['Fecha']} · {p['Cliente']} · estado: **{p['Estado']}**")
     with st.form(f"ficha_{pid}"):
         c1, c2, c3 = st.columns([3, 2, 2])
         nombre = c1.text_input("Nombre", p["Nombre"])
@@ -231,16 +247,16 @@ def _sec_proyecto(pid: str) -> None:
         ivas = ["Por definir", "Exento", "Afecto 19%"]
         iva = c6.selectbox("IVA", ivas, index=ivas.index(p["IVA"]) if p["IVA"] in ivas else 0)
         desc = st.text_area("Descripción y aprendizajes", p["Descripcion"], height=100)
-        sim = st.checkbox("Este proyecto aún tiene datos simulados", value=_bool(p["Simulado"]))
         if st.form_submit_button("💾 Guardar perfil", type="primary"):
             p.update({"Nombre": nombre, "Estado": estado, "Fecha": fecha, "Cliente": cliente, "Asistentes": asistentes,
-                      "IVA": iva, "Descripcion": desc, "Simulado": "TRUE" if sim else "FALSE"})
+                      "IVA": iva, "Descripcion": desc})
             D.guardar_fila("coop_proyectos", p)
             st.success("Guardado.")
             st.rerun()
     items = D.cargar_proyecto("coop_items", pid)
     res = _calcular(pid, _params_de(p.get("Escenario", "")))
     r = res["resumen"]
+    _checklist_proyecto(pid, p, r)
     c = st.columns(4)
     c[0].metric("Líneas de oferta", len(items))
     c[1].metric("Ingreso del proyecto", clp(r["ingreso_total"]))
@@ -252,6 +268,60 @@ def _sec_proyecto(pid: str) -> None:
             D.borrar_proyecto(pid)
             st.session_state.pop("coop_pid", None)
             st.rerun()
+
+
+def _checklist_proyecto(pid: str, p: dict, r: dict) -> None:
+    """Qué falta para dejar el proyecto cerrado y pagado."""
+    st.markdown("#### Para dejar el proyecto listo")
+    pend = {k: v for k, v in _pendientes(pid).items() if v}
+    esc = D.cargar("coop_parametros")
+    e = esc[esc["ID"] == p.get("Escenario", "")]
+    estado_esc = e.iloc[0]["Estado"] if not e.empty else ""
+    pagos = D.cargar_proyecto("coop_pagos", pid)
+    por_pagar = pd.to_numeric(pagos[~pagos["Pagado"].map(_bool)]["Monto"], errors="coerce").sum() if not pagos.empty else 0
+    fondos = D.cargar_proyecto("coop_fondos", pid)
+    entregado = pd.to_numeric(fondos[fondos["Tipo"] == "Aporte entregado a AUCCA"]["Monto"], errors="coerce").sum()
+    pasos = [
+        (not pend, "Confirmar los datos estimados" + (": " + ", ".join(f"{v} de {k}" for k, v in pend.items()) if pend else ""),
+         "Registro / Personas"),
+        (estado_esc == "Acordado", "Acordar la forma de repartir" + (f" (hoy: «{estado_esc}»)" if estado_esc else " (aún sin escenario elegido)"),
+         "Simulador → Parámetros"),
+        (not pagos.empty and por_pagar == 0, "Pagar a las personas" + (f" (faltan {clp(por_pagar)})" if por_pagar else ""),
+         "Pagos y fondos"),
+        (r["aporte_a_aucca"] > 0 and entregado >= r["aporte_a_aucca"],
+         f"Entregar el aporte a AUCCA e ingresarlo en Finanzas (corresponde {clp(r['aporte_a_aucca'])}, entregado {clp(entregado)})",
+         "Pagos y fondos"),
+    ]
+    for ok, texto_, donde in pasos:
+        st.markdown(f"{'✅' if ok else '⬜'} {texto_}  \n<small>→ {donde}</small>", unsafe_allow_html=True)
+
+
+def _abrir(pid: str) -> None:
+    st.session_state["coop_pid"] = pid
+    st.session_state["coop_sec"] = "Resumen"
+
+
+def _sec_proyectos() -> None:
+    st.markdown("### Proyectos de la cooperativa")
+    st.caption("Cada actividad es un proyecto: se diseña, se ejecuta, se reparte y se cierra. "
+               "Abre uno para ver su resumen, registrar lo que pasó y calcular los pagos.")
+    proy = D.cargar("coop_proyectos")
+    for _, p in proy.iterrows():
+        res = _calcular(p["ID"], _params_de(p["Escenario"]))
+        r = res["resumen"]
+        pend = sum(_pendientes(p["ID"]).values())
+        with st.container(border=True):
+            a, b = st.columns([4, 1])
+            a.markdown(f"#### {p['Nombre']}")
+            a.caption(f"{p['Fecha']} · {p['Cliente'] or 'sin cliente'} · {p['Asistentes']} asistentes · "
+                      f"**{p['Estado']}**" + (f" · {pend} datos por confirmar" if pend else ""))
+            b.button("Abrir proyecto", key=f"abrir_{p['ID']}", type="primary", on_click=_abrir, args=(p["ID"],))
+            c = st.columns(4)
+            c[0].metric("Ingreso", clp(r["ingreso_total"]))
+            c[1].metric("Aporte a AUCCA", clp(r["aporte_a_aucca"]))
+            c[2].metric("Pago a personas", clp(r["pagos_trabajo"]))
+            c[3].metric("Horas registradas", f"{r['horas_totales']:g}")
+    _nuevo_proyecto()
 
 
 def _sec_registro(pid: str) -> None:
@@ -286,12 +356,12 @@ def _sec_registro(pid: str) -> None:
             ("PrecioUnit", "num", "Precio unitario (vacío = el de la línea)", None),
             ("Vendedor", "persona", "Vendió", None), ("Productor", "persona", "Productor/a (vacío = según producción)", None),
             ("Medio", "sel", "Medio de pago", MEDIOS), ("Fecha", "text", "Fecha", None),
-            ("Simulado", "bool", "¿Simulado?", None)], items, f"ed_ventas_{pid}", prefijo="v", solo_productos=True,
+            ("PorConfirmar", "bool", "¿Por confirmar?", None)], items, f"ed_ventas_{pid}", prefijo="v", solo_productos=True,
             ayuda="Una fila por venta o grupo de ventas. Ej.: «Plantas vivas · 9 · Diego · Efectivo».")
     with t[2]:
         _tabla_editable("Producción", "coop_produccion", pid, [
             ("ItemID", "item", "Producto", None), ("Persona", "persona", "Quién lo produjo", None),
-            ("Cantidad", "num", "Unidades producidas", None), ("Simulado", "bool", "¿Simulado?", None)],
+            ("Cantidad", "num", "Unidades producidas", None), ("PorConfirmar", "bool", "¿Por confirmar?", None)],
             items, f"ed_prod_{pid}", prefijo="pr", solo_productos=True,
             ayuda="Define quién hizo cuántas unidades. El % de productor se reparte según estas unidades.")
     with t[3]:
@@ -300,7 +370,7 @@ def _sec_registro(pid: str) -> None:
             ("Monto", "num", "Monto $", None), ("PagadoPor", "persona", "Lo pagó", None),
             ("ItemID", "item", "Línea (vacío = todo el proyecto)", None),
             ("ConBoleta", "bool", "¿Con boleta/factura?", None), ("Reembolsado", "bool", "¿Ya reembolsado?", None),
-            ("Simulado", "bool", "¿Simulado?", None)], items, f"ed_costos_{pid}", prefijo="c",
+            ("PorConfirmar", "bool", "¿Por confirmar?", None)], items, f"ed_costos_{pid}", prefijo="c",
             ayuda="Los costos de una línea se descuentan antes de repartir esa línea. Los del proyecto se descuentan "
                   "de la bolsa de servicios. Quien pagó de su bolsillo recibe reembolso aparte.")
     with t[4]:
@@ -309,7 +379,7 @@ def _sec_registro(pid: str) -> None:
             ("ItemID", "item", "Línea (vacío = tarea de base: baños, orden, logística…)", None),
             ("Horas", "num", "Horas", None), ("Nivel", "sel", "Nivel (1–4)", ["1", "2", "3", "4"]),
             ("Esfuerzo", "sel", "Esfuerzo (1–5, opcional)", ["", "1", "2", "3", "4", "5"]),
-            ("Origen", "sel", "Origen del dato", ["Real", "Simulado"]), ("Evidencia", "text", "Evidencia (enlace a audio/foto)", None)],
+            ("Origen", "sel", "Origen del dato", ["Real", "Estimado"]), ("Evidencia", "text", "Evidencia (enlace a audio/foto)", None)],
             items, f"ed_reg_{pid}", prefijo="r",
             ayuda="Incluye TODO: preparar, comprar, cocinar, guiar, ordenar, limpiar, difundir. Nivel: 1 operación · "
                   "2 técnico · 3 diseño/facilitación · 4 dirección. Las horas en líneas de producto no entran a la bolsa: "
@@ -322,7 +392,7 @@ def _sec_resultados(pid: str) -> None:
     eid, params, estado = _selector_escenario(pid, f"esc_res_{pid}", p)
     res = _calcular(pid, params)
     r = res["resumen"]
-    _aviso_simulado(res, p)
+    _aviso_por_confirmar(pid)
     if estado:
         st.caption(f"Escenario «{estado}» · método: **{M.METODOS[r['metodo']]}**")
     else:
@@ -500,7 +570,7 @@ def _sec_simulador(pid: str) -> None:
     if st.toggle("Ajustar parámetros de esta simulación", key=f"sim_tog_{pid}"):
         params = _form_parametros(base, f"sim_{pid}_{eid}")
     res = _calcular(pid, params)
-    _aviso_simulado(res, p)
+    _aviso_por_confirmar(pid)
     comp = res["comparacion"]
     if comp.empty:
         st.info("Registra horas, ventas o producción para simular.")
@@ -584,7 +654,7 @@ def _sec_planificar(pid: str) -> None:
         if st.button("Crear proyecto", key=f"pl_c_{pid}", type="primary"):
             nid = D.nuevo_id("p")
             D.guardar_fila("coop_proyectos", {"ID": nid, "Nombre": nom, "Tipo": p["Tipo"], "Fecha": "", "Estado": "Diseño",
-                                              "Cliente": "", "Asistentes": asis, "IVA": p["IVA"], "Simulado": "FALSE",
+                                              "Cliente": "", "Asistentes": asis, "IVA": p["IVA"],
                                               "Descripcion": f"Basado en «{p['Nombre']}».", "Escenario": eid})
             _copiar_oferta(pid, nid, asis, escala)
             st.session_state["coop_pid"] = nid
@@ -693,7 +763,7 @@ def _sec_pagos(pid: str) -> None:
 def _sec_personas(pid: str) -> None:
     st.markdown("### Perfiles de las personas")
     st.caption("Cada persona declara qué ofrece y cuánto valora su hora. Esto alimenta el método F y la planificación. "
-               "Los valores con «Simulado» marcado son de ejemplo: cada persona debe confirmar el suyo.")
+               "Los valores con «Por confirmar» marcado son estimaciones: cada persona debe confirmar el suyo.")
     df = D.cargar("coop_personas")
     if df.empty:
         df = pd.DataFrame({"Persona": AUCCANES})
@@ -701,16 +771,16 @@ def _sec_personas(pid: str) -> None:
     v = df.copy()
     for c in ("ValorHora", "HorasMes"):
         v[c] = pd.to_numeric(v[c], errors="coerce")
-    v["Simulado"] = v["Simulado"].map(_bool)
+    v["PorConfirmar"] = v["PorConfirmar"].map(_bool)
     ed = st.data_editor(v, hide_index=True, use_container_width=True, num_rows="dynamic", key="per_ed", column_config={
         "Persona": st.column_config.TextColumn("Persona"), "ValorHora": st.column_config.NumberColumn("Valor de mi hora $"),
         "Ofrece": st.column_config.TextColumn("Qué puedo ofrecer (talleres, cocina, difusión, mantención…)"),
         "HorasMes": st.column_config.NumberColumn("Horas al mes disponibles"),
         "Nivel": st.column_config.SelectboxColumn("Nivel habitual", options=["1", "2", "3", "4"]),
-        "Notas": st.column_config.TextColumn("Notas"), "Simulado": st.column_config.CheckboxColumn("¿Simulado?")})
+        "Notas": st.column_config.TextColumn("Notas"), "PorConfirmar": st.column_config.CheckboxColumn("¿Por confirmar?")})
     if st.button("💾 Guardar perfiles", type="primary", key="per_save"):
         o = ed.copy()
-        o["Simulado"] = o["Simulado"].map(lambda x: "TRUE" if x is True else "FALSE")
+        o["PorConfirmar"] = o["PorConfirmar"].map(lambda x: "TRUE" if x is True else "FALSE")
         for c in ("ValorHora", "HorasMes"):
             o[c] = o[c].map(lambda x: "" if pd.isna(x) else str(int(x)))
         D.guardar_tabla("coop_personas", o.fillna(""))
@@ -794,27 +864,31 @@ def render() -> None:
     st.caption("Proyectos, reparto justo del trabajo y claridad del dinero. Datos en: " + D.modo_datos() + ".")
     if not D.usa_sheets():
         st.info("Modo de prueba: los datos se guardan en un archivo local, no en Google Sheets.")
+    if D.instalacion_nueva():
+        # primera vez: queda registrado el primer proyecto de la cooperativa (la visita del 13 de noviembre)
+        D.sembrar_proyecto_inicial()
+        st.rerun()
     proy = D.cargar("coop_proyectos")
-    secciones = ["Proyecto", "Registro", "Resultados", "Simulador", "Parámetros", "Planificar",
+    secciones = ["Proyectos", "Resumen", "Registro", "Resultados", "Simulador", "Parámetros", "Planificar",
                  "Pagos y fondos", "Personas", "Círculos", "Manual"]
-    if proy.empty:
-        st.markdown("Aún no hay proyectos. Crea uno o carga el ejemplo del viernes 13 (datos simulados).")
-        if st.button("📥 Cargar ejemplo: Visita Red de Escuelas Comunitarias (13 nov)", type="primary"):
-            D.cargar_ejemplo()
-            st.rerun()
-        _nuevo_proyecto()
-        _sec_manual()
+    sec = st.radio("Sección", secciones, horizontal=True, label_visibility="collapsed", key="coop_sec")
+    if sec == "Proyectos" or proy.empty:
+        st.markdown("---")
+        _sec_proyectos()
         return
     ids = proy["ID"].tolist()
     nombres = {r["ID"]: f"{r['Nombre']} · {r['Fecha']} · {r['Estado']}" for _, r in proy.iterrows()}
     actual = st.session_state.get("coop_pid", ids[0])
-    pid = st.selectbox("Proyecto", ids, index=ids.index(actual) if actual in ids else 0, format_func=lambda i: nombres[i])
-    st.session_state["coop_pid"] = pid
-    _nuevo_proyecto()
-    sec = st.radio("Sección", secciones, horizontal=True, label_visibility="collapsed", key="coop_sec")
+    if actual not in ids:
+        actual = ids[0]
+    if sec in ("Círculos", "Manual"):
+        pid = actual
+    else:
+        pid = st.selectbox("Proyecto", ids, index=ids.index(actual), format_func=lambda i: nombres[i])
+        st.session_state["coop_pid"] = pid
     st.markdown("---")
-    if sec == "Proyecto":
-        _sec_proyecto(pid)
+    if sec == "Resumen":
+        _sec_resumen(pid)
     elif sec == "Registro":
         _sec_registro(pid)
     elif sec == "Resultados":

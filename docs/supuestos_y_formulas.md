@@ -11,7 +11,7 @@
 | Gastos de cuenta bancaria y firma electrónica (~$20.000) | Salen de los fondos de AUCCA, **no** del proyecto | Acta 22 de noviembre |
 | Factura exenta de IVA; declarar a más tardar el 20 de diciembre | Hecho/plazo | Acta 22 de noviembre |
 | Reserva de espacio 15%, fondo común 10%, factores de nivel 1,0–1,5, mezcla C 20/40/40, valor de referencia $20.000 la hora | **Hipótesis para simular**, no acuerdos | Borrador de ideas de la cooperativa |
-| Horas, costos, cantidades vendidas y tarifas del proyecto de ejemplo | **Simulados** | Reemplazar con datos reales |
+| Horas, costos, cantidades vendidas y tarifas del proyecto del 13 de noviembre | **Estimados («por confirmar»)** | Cada persona los confirma; se corrigen en Registro y Personas |
 
 ## 2. Estructura del dinero (cascada)
 ```

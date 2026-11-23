@@ -9,7 +9,7 @@ Esta pestaña ayuda a tres cosas:
 > Regla de oro: **el dinero de un proyecto no es dinero de AUCCA.** Vive en esta pestaña, en custodia, hasta que se paga a las personas. Solo el «aporte a AUCCA» pasa a ser de AUCCA, y se ingresa **a mano** en la pestaña Finanzas. Esta plataforma nunca escribe en Finanzas.
 
 ## El recorrido de un proyecto (paso a paso)
-1. **Crear el proyecto** (arriba, «➕ Crear proyecto nuevo»): nombre, fecha, cliente, asistentes, IVA. Puedes copiar la oferta de otro proyecto.
+1. **Crear el proyecto** (en «Proyectos», «➕ Crear proyecto nuevo»): nombre, fecha, cliente, asistentes, IVA. Puedes copiar la oferta de otro proyecto.
 2. **Registro → Oferta**: define las líneas. Hay dos tipos:
    - **Servicio**: se cobra al cliente por persona (recorrido, talleres, alimentación contratada).
    - **Producto**: se vende directo (planta viva, planta seca, semillas, postres). Se reparte entre productor/a, vendedor/a y espacio (AUCCA).
@@ -26,7 +26,8 @@ Esta pestaña ayuda a tres cosas:
 ## Las secciones
 | Sección | Qué haces ahí |
 |---|---|
-| **Proyecto** | Ficha del proyecto: estado, cliente, asistentes, IVA, aprendizajes. |
+| **Proyectos** | Lista de todos los proyectos con sus cifras clave. Desde aquí abres uno o creas uno nuevo. |
+| **Resumen** | Ficha del proyecto, cifras clave y lista de lo que falta para dejarlo cerrado y pagado. |
 | **Registro** | Oferta, ventas, producción, costos y horas. Todas las tablas se editan y se guardan con su botón. |
 | **Resultados** | Cascada del dinero, pago por persona, aporte por persona y cuadratura. Descarga CSV. |
 | **Simulador** | Mueve porcentajes y métodos y ve el efecto al instante. Nada se guarda hasta que lo guardas como escenario. |
@@ -41,11 +42,11 @@ Esta pestaña ayuda a tres cosas:
 - **Cuánto aportó**: valor que generó con su trabajo (ingreso de las líneas de servicio en que trabajó, según sus horas, más el ingreso de los productos que produjo), sus horas y las unidades que produjo y vendió. Sirve para ver el aporte aunque el reparto sea distinto.
 - Los **reembolsos** no son ganancia: devuelven lo que alguien puso de su bolsillo.
 
-## Datos simulados
-Mientras no tengamos las horas y ventas reales, el proyecto de ejemplo del viernes 13 usa **datos simulados** (marcados como tales). Para pasar a datos reales: edita las tablas de «Registro», desmarca «¿Simulado?» y revisa «Personas». Los precios de los servicios sí vienen del acta del 8 de noviembre.
+## El primer proyecto: visita del 13 de noviembre
+La plataforma parte con un proyecto real: la **visita de la Red de Escuelas Comunitarias** (viernes 13 de noviembre, 32 personas, $512.000 sin IVA). Los precios de los servicios vienen del acta del 8 de noviembre. Las horas, costos, cantidades vendidas y valores de hora son **estimaciones marcadas «por confirmar»** hasta que cada persona entregue sus datos. Para confirmarlos: edita las tablas de «Registro», desmarca «¿Por confirmar?» (o cambia el origen de las horas a «Real») y revisa «Personas». La sección «Resumen» muestra qué falta para dejar el proyecto listo.
 
 ## Planificar una actividad futura
-1. Abre un proyecto parecido (por ejemplo, el del 13).
+1. Abre un proyecto parecido (por ejemplo, la visita del 13).
 2. Entra a **Planificar** y mueve «Asistentes» y «Escala de productos».
 3. Mira el **valor por hora estimado** frente a la tarifa de referencia y la tabla **¿Conviene ofrecerlo?**.
 4. Si te sirve, **crea un proyecto nuevo con estos supuestos**: se copian oferta y costos para seguir ajustando.

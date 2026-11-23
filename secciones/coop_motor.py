@@ -296,7 +296,7 @@ def calcular(proyecto: dict, items, ventas, produccion, registro, costos,
     horas_base: dict[str, float] = defaultdict(float)  # tareas sin línea
     horas_producto: dict[str, float] = defaultdict(float)  # producir/vender productos: se paga por el % productor/vendedor
     peso_tarifa: dict[str, float] = defaultdict(float)
-    simulado = False
+    por_confirmar = False
     for r in registro:
         p = texto(r.get("Persona"))
         h = num(r.get("Horas"))
@@ -317,8 +317,8 @@ def calcular(proyecto: dict, items, ventas, produccion, registro, costos,
             horas_item[iid][p] += h
         else:
             horas_base[p] += h
-        if texto(r.get("Origen")).lower().startswith("sim"):
-            simulado = True
+        if texto(r.get("Origen")).lower().startswith(("sim", "estim")):
+            por_confirmar = True
 
     participantes = sorted(horas)
     if not participantes and excedente > 0:
@@ -424,7 +424,7 @@ def calcular(proyecto: dict, items, ventas, produccion, registro, costos,
         "pagos_trabajo": pagos_trabajo, "sin_asignar": sin_asignar,
         "reembolsos": int(round(sum(reembolso_pend.values()))),
         "horas_totales": round(sum(horas.values()), 2), "metodo": metodo,
-        "simulado": simulado,
+        "por_confirmar": por_confirmar,
     }
     # cuadratura: ingresos − costos = AUCCA + fondo común + pagos + sin asignar
     cuadra = (resumen["ingreso_total"] - resumen["costos_total"]

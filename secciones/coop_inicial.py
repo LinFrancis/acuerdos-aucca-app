@@ -1,22 +1,22 @@
-"""Datos de EJEMPLO del proyecto «Visita Red de Escuelas Comunitarias» (viernes 13 de nov 2026).
+"""Primer proyecto de la plataforma: «Visita Red de Escuelas Comunitarias» (viernes 13 de nov 2026).
 
 Los precios de los servicios y el total ($512.000 = $16.000 × 32) vienen del acta del 8 de
-noviembre. Las horas, los costos, las cantidades de productos y las tarifas son SIMULADOS
-y deben reemplazarse por los datos reales que entregue cada persona.
+noviembre. Las horas, los costos, las cantidades de productos y las tarifas son ESTIMACIONES
+(marcadas «por confirmar») hasta que cada persona entregue sus datos reales.
 """
 CHALO, CAMILU, NIKO, DIEGO, FRANCIS, TAIS, CALA = (
     "🚴🏻Chalo", "🌿Camilú", "⚽Niko", "🍃Diego", "🪈Francis", "🌌Tais", "🌊Cala")
 PID = "p-visita-13nov"
 
 
-def datos_ejemplo() -> dict[str, list[dict]]:
+def datos_proyecto_inicial() -> dict[str, list[dict]]:
     proyecto = [{
         "ID": PID, "Nombre": "Visita Red de Escuelas Comunitarias", "Tipo": "Visita / jornada",
         "Fecha": "2026-11-13", "Estado": "En cierre", "Cliente": "Red de Escuelas Comunitarias",
         "Asistentes": 32, "IVA": "Exento", "Escenario": "",
         "Descripcion": "Recorrido por las estaciones, snack, 2 talleres y almuerzo de cierre para 32 personas adultas. "
-                       "Propuesta económica del acta del 8 de noviembre: $16.000 por persona, $512.000 sin IVA.",
-        "Simulado": "TRUE"}]
+                       "Propuesta económica del acta del 8 de noviembre: $16.000 por persona, $512.000 sin IVA. "
+                       "Evaluado en la reunión del 22 de noviembre; falta definir el reparto del dinero."}]
 
     def serv(i, cat, nombre, precio, horas):
         return {"ID": i, "ProyectoID": PID, "Tipo": "Servicio", "Categoria": cat, "Nombre": nombre,
@@ -43,12 +43,12 @@ def datos_ejemplo() -> dict[str, list[dict]]:
         ("p-semillas", 12, DIEGO, "Efectivo"),
     ]
     ventas = [{"ID": f"v{n}", "ProyectoID": PID, "ItemID": a, "Cantidad": b, "PrecioUnit": "",
-               "Vendedor": c, "Productor": "", "Medio": d, "Fecha": "2026-11-13", "Simulado": "TRUE"}
+               "Vendedor": c, "Productor": "", "Medio": d, "Fecha": "2026-11-13", "PorConfirmar": "TRUE"}
               for n, (a, b, c, d) in enumerate(ventas, 1)]
     produccion = [("p-viva", DIEGO, 12), ("p-viva", CALA, 8), ("p-seca", TAIS, 6),
                   ("p-seca", CAMILU, 4), ("p-semillas", CAMILU, 15)]
     produccion = [{"ID": f"pr{n}", "ProyectoID": PID, "ItemID": a, "Persona": b, "Cantidad": c,
-                   "Simulado": "TRUE"} for n, (a, b, c) in enumerate(produccion, 1)]
+                   "PorConfirmar": "TRUE"} for n, (a, b, c) in enumerate(produccion, 1)]
     costos = [
         ("Insumos de empanadas y jugo", 45000, NIKO, "s-almuerzo"),
         ("Insumos del snack", 30000, CALA, "s-snack"),
@@ -56,7 +56,7 @@ def datos_ejemplo() -> dict[str, list[dict]]:
         ("Gas, bebidas y desechables del día", 8000, DIEGO, ""),
     ]
     costos = [{"ID": f"c{n}", "ProyectoID": PID, "Fecha": "2026-11-13", "Concepto": a, "Monto": b,
-               "PagadoPor": c, "ItemID": d, "ConBoleta": "FALSE", "Reembolsado": "FALSE", "Simulado": "TRUE"}
+               "PagadoPor": c, "ItemID": d, "ConBoleta": "FALSE", "Reembolsado": "FALSE", "PorConfirmar": "TRUE"}
               for n, (a, b, c, d) in enumerate(costos, 1)]
     reg = [  # persona, tarea, item, horas, nivel
         (TAIS, "Planificar y guiar recorrido", "s-recorrido", 4, 3),
@@ -81,7 +81,7 @@ def datos_ejemplo() -> dict[str, list[dict]]:
         (FRANCIS, "Registro, documentación y cuadratura", "", 2, 2),
     ]
     registro = [{"ID": f"r{n}", "ProyectoID": PID, "Persona": a, "Tarea": b, "ItemID": c, "Horas": d,
-                 "Nivel": e, "Esfuerzo": "", "Origen": "Simulado", "Evidencia": ""}
+                 "Nivel": e, "Esfuerzo": "", "Origen": "Estimado", "Evidencia": ""}
                 for n, (a, b, c, d, e) in enumerate(reg, 1)]
     tarifas = {CHALO: 8000, CAMILU: 12000, NIKO: 12000, DIEGO: 15000, FRANCIS: 12000, TAIS: 18000, CALA: 10000}
     ofrece = {
@@ -90,7 +90,7 @@ def datos_ejemplo() -> dict[str, list[dict]]:
         FRANCIS: "Registro, administración, sistematización", TAIS: "Talleres, plantas secas, recorridos",
         CALA: "Cocina y snacks, compostaje, vivero"}
     personas = [{"Persona": k, "ValorHora": v, "Ofrece": ofrece[k], "HorasMes": 20, "Nivel": "1",
-                 "Notas": "Valor simulado: pídele a cada persona que declare el suyo.", "Simulado": "TRUE"}
+                 "Notas": "Valor estimado: cada persona debe confirmar el suyo.", "PorConfirmar": "TRUE"}
                 for k, v in tarifas.items()]
     import json
     from secciones import coop_motor as M

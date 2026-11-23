@@ -17,18 +17,18 @@ import streamlit as st
 
 TABLAS: dict[str, list[str]] = {
     "coop_proyectos": ["ID", "Nombre", "Tipo", "Fecha", "Estado", "Cliente", "Asistentes", "IVA",
-                       "Escenario", "Descripcion", "Simulado"],
+                       "Escenario", "Descripcion"],
     "coop_items": ["ID", "ProyectoID", "Tipo", "Categoria", "Nombre", "Unidad", "Precio", "CostoUnit",
                    "CantidadPlan", "CantidadReal", "HorasPlan", "Productores", "Vendedor",
                    "PctProductor", "PctVendedor"],
     "coop_ventas": ["ID", "ProyectoID", "ItemID", "Cantidad", "PrecioUnit", "Vendedor", "Productor",
-                    "Medio", "Fecha", "Simulado"],
-    "coop_produccion": ["ID", "ProyectoID", "ItemID", "Persona", "Cantidad", "Simulado"],
+                    "Medio", "Fecha", "PorConfirmar"],
+    "coop_produccion": ["ID", "ProyectoID", "ItemID", "Persona", "Cantidad", "PorConfirmar"],
     "coop_costos": ["ID", "ProyectoID", "Fecha", "Concepto", "Monto", "PagadoPor", "ItemID",
-                    "ConBoleta", "Reembolsado", "Simulado"],
+                    "ConBoleta", "Reembolsado", "PorConfirmar"],
     "coop_registro": ["ID", "ProyectoID", "Persona", "Tarea", "ItemID", "Horas", "Nivel", "Esfuerzo",
                       "Origen", "Evidencia"],
-    "coop_personas": ["Persona", "ValorHora", "Ofrece", "HorasMes", "Nivel", "Notas", "Simulado"],
+    "coop_personas": ["Persona", "ValorHora", "Ofrece", "HorasMes", "Nivel", "Notas", "PorConfirmar"],
     "coop_parametros": ["ID", "Nombre", "Estado", "Notas", "Parametros", "Actualizado"],
     "coop_pagos": ["ID", "ProyectoID", "Persona", "Concepto", "Monto", "Pagado", "FechaPago", "Medio", "Nota"],
     "coop_fondos": ["ID", "ProyectoID", "Fecha", "Tipo", "Monto", "Custodia", "Nota"],
@@ -177,13 +177,19 @@ def borrar_proyecto(proyecto_id: str) -> None:
     _escribir_todo("coop_proyectos", act[act["ID"] != proyecto_id])
 
 
-def cargar_ejemplo() -> None:
-    """Carga el proyecto de ejemplo (viernes 13). Solo agrega; no borra nada."""
-    from secciones.coop_ejemplo import datos_ejemplo
-    for tabla, filas in datos_ejemplo().items():
+def sembrar_proyecto_inicial() -> None:
+    """Crea el primer proyecto de la plataforma (visita del viernes 13) con lo que dicen las actas
+    y estimaciones marcadas «por confirmar». Solo agrega; no borra ni pisa nada."""
+    from secciones.coop_inicial import datos_proyecto_inicial
+    for tabla, filas in datos_proyecto_inicial().items():
         actual = cargar(tabla, fresco=True)
         nuevas = _normalizar(tabla, pd.DataFrame(filas))
         clave = "Persona" if tabla == "coop_personas" else "ID"
         nuevas = nuevas[~nuevas[clave].isin(actual[clave])]
         if not nuevas.empty:
             _escribir_todo(tabla, pd.concat([actual, nuevas], ignore_index=True))
+
+
+def instalacion_nueva() -> bool:
+    """True si todavía no hay proyectos, escenarios ni horas (primera vez que se abre el módulo)."""
+    return all(cargar(t).empty for t in ("coop_proyectos", "coop_parametros", "coop_registro"))

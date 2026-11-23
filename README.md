@@ -57,7 +57,7 @@ Proyectos con oferta (servicios y productos), ventas, producción, costos y hora
 ```
 secciones/coop_motor.py    # cálculos (sin Streamlit; con tests)
 secciones/coop_datos.py    # Google Sheets (hojas coop_*) o archivo local si no hay credenciales
-secciones/coop_ejemplo.py  # datos de ejemplo del viernes 13 de nov (SIMULADOS)
+secciones/coop_inicial.py  # primer proyecto: visita del viernes 13 de nov (datos estimados «por confirmar»)
 secciones/cooperativa.py   # pantallas
 docs/                      # manual, supuestos y fórmulas, reglamento borrador, notas legales
 tests/test_coop_motor.py   # pytest

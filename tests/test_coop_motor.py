@@ -2,9 +2,9 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import pytest
 from secciones import coop_motor as M
-from secciones.coop_ejemplo import datos_ejemplo, DIEGO, CALA, TAIS, CAMILU, NIKO
+from secciones.coop_inicial import datos_proyecto_inicial, DIEGO, CALA, TAIS, CAMILU, NIKO
 
-D = datos_ejemplo()
+D = datos_proyecto_inicial()
 
 
 def correr(**p):
