@@ -1,12 +1,17 @@
 """Primer proyecto de la plataforma: «Visita Red de Escuelas Comunitarias» (viernes 13 de nov 2026).
 
 Los precios de los servicios y el total ($512.000 = $16.000 × 32) vienen del acta del 8 de
-noviembre. Las horas, los costos, las cantidades de productos y las tarifas son ESTIMACIONES
-(marcadas «por confirmar») hasta que cada persona entregue sus datos reales.
+noviembre. Las horas, gastos, ventas y valores de hora son los que cada persona declaró el 23 y
+24 de noviembre de 2026 (ver «Informacion_declarada_visita_13_noviembre.docx»). Lo que aún no
+entregaron (horas por tarea de Camilú, ventas de Camilú, quién produjo cada planta, valor de hora
+de Camilú, Chalo y Francis) queda marcado como «por confirmar».
 """
 CHALO, CAMILU, NIKO, DIEGO, FRANCIS, TAIS, CALA = (
     "🚴🏻Chalo", "🌿Camilú", "⚽Niko", "🍃Diego", "🪈Francis", "🌌Tais", "🌊Cala")
 PID = "p-visita-13nov"
+# IDs de la primera carga (estimaciones). Si el registro de horas solo tiene estos, nadie lo ha tocado
+# y se puede reemplazar por los datos reales.
+IDS_REGISTRO_ESTIMADO = {f"r{n}" for n in range(1, 21)}
 
 
 def datos_proyecto_inicial() -> dict[str, list[dict]]:
@@ -16,7 +21,7 @@ def datos_proyecto_inicial() -> dict[str, list[dict]]:
         "Asistentes": 32, "IVA": "Exento", "Escenario": "",
         "Descripcion": "Recorrido por las estaciones, snack, 2 talleres y almuerzo de cierre para 32 personas adultas. "
                        "Propuesta económica del acta del 8 de noviembre: $16.000 por persona, $512.000 sin IVA. "
-                       "Evaluado en la reunión del 22 de noviembre; falta definir el reparto del dinero."}]
+                       "Horas, gastos y ventas cargados con lo que declaró cada persona (24 nov). Falta definir el reparto del dinero."}]
 
     def serv(i, cat, nombre, precio, horas):
         return {"ID": i, "ProyectoID": PID, "Tipo": "Servicio", "Categoria": cat, "Nombre": nombre,
@@ -33,64 +38,77 @@ def datos_proyecto_inicial() -> dict[str, list[dict]]:
         serv("s-snack", "Snack / coffee", "Snack media mañana (sándwich + jugo)", 3000, 5),
         serv("s-talleres", "Taller", "2 talleres: eficiencia hídrica y propagación de nativas", 6000, 11),
         serv("s-almuerzo", "Alimentación (servicio)", "Empanada de vegetales + jugo (cierre)", 4000, 11),
-        prod("p-viva", "Planta viva", "Plantas vivas del invernadero", 3500, 20, f"{DIEGO}, {CALA}", DIEGO, 7),
-        prod("p-seca", "Planta seca", "Plantas secas (arreglos)", 2500, 10, f"{TAIS}, {CAMILU}", DIEGO, 5),
-        prod("p-semillas", "Semillas", "Sobres de semillas", 1000, 15, CAMILU, DIEGO, 2),
+        prod("p-viva", "Planta viva", "Plantas vivas del invernadero", 3500, 20, "", "", 0),
+        prod("p-seca", "Planta seca", "Plantas secas (arreglos)", 2500, 10, "", "", 0),
+        prod("p-semillas", "Semillas", "Sobres de semillas", 1000, 15, "", "", 0),
     ]
-    ventas = [  # (item, cantidad, vendedor, medio)
-        ("p-viva", 9, DIEGO, "Efectivo"), ("p-viva", 6, CALA, "Transferencia"),
-        ("p-seca", 4, DIEGO, "Efectivo"), ("p-seca", 2, DIEGO, "Transferencia"),
-        ("p-semillas", 12, DIEGO, "Efectivo"),
-    ]
-    ventas = [{"ID": f"v{n}", "ProyectoID": PID, "ItemID": a, "Cantidad": b, "PrecioUnit": "",
-               "Vendedor": c, "Productor": "", "Medio": d, "Fecha": "2026-11-13", "PorConfirmar": "TRUE"}
+    # Ventas declaradas por Diego: $12.500 en plantas secas y $16.000 en plantas vivas. Cada total se
+    # registra como una venta agrupada (cantidad 1 × monto) porque no declaró las unidades.
+    # El detalle de ventas de Camilú del día 13 aún no existe.
+    ventas = [("p-seca", 1, 12500, DIEGO), ("p-viva", 1, 16000, DIEGO)]
+    ventas = [{"ID": f"v{n}", "ProyectoID": PID, "ItemID": a, "Cantidad": b, "PrecioUnit": c,
+               "Vendedor": d, "Productor": "", "Medio": "", "Fecha": "2026-11-13", "PorConfirmar": "TRUE"}
               for n, (a, b, c, d) in enumerate(ventas, 1)]
-    produccion = [("p-viva", DIEGO, 12), ("p-viva", CALA, 8), ("p-seca", TAIS, 6),
-                  ("p-seca", CAMILU, 4), ("p-semillas", CAMILU, 15)]
-    produccion = [{"ID": f"pr{n}", "ProyectoID": PID, "ItemID": a, "Persona": b, "Cantidad": c,
-                   "PorConfirmar": "TRUE"} for n, (a, b, c) in enumerate(produccion, 1)]
+    produccion = []   # nadie ha declarado quién produjo cada planta
+    # Gastos: compras de Cala ($57.278 en total, con el detalle por preparación que ella entregó),
+    # masas de Nico y traslado de Tais. Todos ya reembolsados, ninguno con boleta.
     costos = [
-        ("Insumos de empanadas y jugo", 45000, NIKO, "s-almuerzo"),
-        ("Insumos del snack", 30000, CALA, "s-snack"),
-        ("Materiales de los talleres", 25000, TAIS, "s-talleres"),
-        ("Gas, bebidas y desechables del día", 8000, DIEGO, ""),
+        ("Colación (pan, palta, queso, frutillas y jugo)", 28753, CALA, "s-snack", "FALSE"),
+        ("Insumos de las empanadas, sin las masas", 16525, CALA, "s-almuerzo", "FALSE"),
+        ("Masas de empanadas", 12000, NIKO, "s-almuerzo", "FALSE"),
+        ("Traslado de Tais (micro y metro). Diego le adelantó $5.000 desde la venta de plantas", 2400, TAIS, "", "TRUE"),
     ]
     costos = [{"ID": f"c{n}", "ProyectoID": PID, "Fecha": "2026-11-13", "Concepto": a, "Monto": b,
-               "PagadoPor": c, "ItemID": d, "ConBoleta": "FALSE", "Reembolsado": "FALSE", "PorConfirmar": "TRUE"}
-              for n, (a, b, c, d) in enumerate(costos, 1)]
-    reg = [  # persona, tarea, item, horas, nivel
-        (TAIS, "Planificar y guiar recorrido", "s-recorrido", 4, 3),
-        (CAMILU, "Planificar y guiar recorrido", "s-recorrido", 4, 3),
-        (NIKO, "Planificar y guiar recorrido", "s-recorrido", 4, 3),
-        (TAIS, "Diseñar, comprar materiales y dictar taller", "s-talleres", 5.5, 3),
-        (DIEGO, "Diseñar, comprar materiales y dictar taller", "s-talleres", 5.5, 3),
-        (NIKO, "Comprar, armar y hornear empanadas", "s-almuerzo", 11, 1),
-        (CALA, "Comprar y preparar snack", "s-snack", 4.5, 1),
-        (DIEGO, "Armar, atender y desarmar puesto Aucca", "p-viva", 5, 1),
-        (DIEGO, "Almácigos y plantas vivas", "p-viva", 4, 1),
-        (CALA, "Almácigos y plantas vivas", "p-viva", 3, 1),
-        (TAIS, "Plantas secas", "p-seca", 3, 1),
-        (CAMILU, "Plantas secas y semillas", "p-seca", 2, 1),
-        (DIEGO, "Orden del invernadero", "", 2, 1),
-        (DIEGO, "Despeje de caminos y cacas de perros", "", 3, 1),
-        (DIEGO, "Contacto con la contraparte y propuesta", "", 3, 2),
-        (CAMILU, "Preparación de baños", "", 2.5, 1),
-        (CALA, "Zona de compostaje", "", 2, 1),
-        (CHALO, "Sala, mesas, sillas y sombras", "", 3, 1),
-        (NIKO, "Basura y zona de reciclaje", "", 1.5, 1),
-        (FRANCIS, "Registro, documentación y cuadratura", "", 2, 2),
+               "PagadoPor": c, "ItemID": d, "ConBoleta": "FALSE", "Reembolsado": "TRUE", "PorConfirmar": pc}
+              for n, (a, b, c, d, pc) in enumerate(costos, 1)]
+    # persona, tarea, línea, horas, nivel, esfuerzo (1–5, si lo declaró), origen
+    reg = [
+        (NIKO, "Comprar masas de empanadas", "s-almuerzo", 0.33, 1, "", "Real"),
+        (NIKO, "Limpiar cocina y preparar relleno de empanadas", "s-almuerzo", 4, 1, "", "Real"),
+        (NIKO, "Guiar el recorrido", "s-recorrido", 2, 3, "", "Real"),
+        (NIKO, "Armar y hornear empanadas", "s-almuerzo", 2, 1, "", "Real"),
+        (NIKO, "Ordenar el espacio después de la visita", "", 2, 1, "", "Real"),
+        (CALA, "Propuesta de colación: planificar, cotizar menú y calcular gastos", "s-snack", 0.5, 2, 1, "Real"),
+        (CALA, "Compras en feria, supermercados y locales de Talagante (snack y empanadas)", "", 2, 1, 4, "Real"),
+        (CALA, "Cotizar, encargar y retirar 32 panes", "s-snack", 0.25, 1, 1, "Real"),
+        (CALA, "Remojo y lavado de frutillas, jugo para 40 porciones", "s-snack", 2, 1, 3, "Real"),
+        (CALA, "Preparar pan con palta y queso", "s-snack", 1.5, 1, 3, "Real"),
+        (CALA, "Montaje de la mesa de alimentación", "", 0.5, 1, 1, "Real"),
+        (DIEGO, "Coordinación, planificación y propuesta del documento de la visita", "", 3, 2, "", "Real"),
+        (DIEGO, "Orden del invernadero y del patio", "", 2, 1, "", "Real"),
+        # Horas juntas: puesto/ventas, sala, fotos, guardián del tiempo, taller y orden. Falta separarlas.
+        (DIEGO, "Puesto de AUCCA, sala, registro fotográfico, guardián del tiempo, taller de propagación y orden posterior (9:00–17:00)", "", 8, 2, "", "Estimado"),
+        (TAIS, "Planificación y reunión con Diego, Nico y Camilú", "", 0.8, 2, "", "Real"),
+        (TAIS, "Preparar la presentación (trabajó más de 6 h; cuenta 3)", "", 3, 3, "", "Real"),
+        (TAIS, "Orden zona de hornos, limpieza de sillas, sala y baño", "", 0.6, 1, "", "Real"),
+        (TAIS, "Recorrido de AUCCA", "s-recorrido", 2, 3, "", "Real"),
+        (TAIS, "Dos talleres de 1 hora", "s-talleres", 2, 3, "", "Real"),
+        # Camilú declaró solo su horario; falta el desglose por tarea.
+        (CAMILU, "Horario 9–15 h: recorrido guiado, limpieza de baños, jugos, lavado de loza y ventas (sin desglose)", "", 6, 2, "", "Estimado"),
     ]
-    registro = [{"ID": f"r{n}", "ProyectoID": PID, "Persona": a, "Tarea": b, "ItemID": c, "Horas": d,
-                 "Nivel": e, "Esfuerzo": "", "Origen": "Estimado", "Evidencia": ""}
-                for n, (a, b, c, d, e) in enumerate(reg, 1)]
-    tarifas = {CHALO: 8000, CAMILU: 12000, NIKO: 12000, DIEGO: 15000, FRANCIS: 12000, TAIS: 18000, CALA: 10000}
+    registro = [{"ID": f"rh{n}", "ProyectoID": PID, "Persona": a, "Tarea": b, "ItemID": c, "Horas": d,
+                 "Nivel": e, "Esfuerzo": f, "Origen": g, "Evidencia": ""}
+                for n, (a, b, c, d, e, f, g) in enumerate(reg, 1)]
+    # valor de hora declarado (promedio o mínimo); para quienes no respondieron queda una estimación
+    tarifas = {CHALO: (8000, True), CAMILU: (12000, True), NIKO: (10000, False), DIEGO: (15000, False),
+               FRANCIS: (12000, True), TAIS: (10000, False), CALA: (10000, False)}
     ofrece = {
-        CHALO: "Mantención, construcción, orden del espacio", CAMILU: "Recorridos, plantas, semillas, difusión",
-        NIKO: "Cocina, recorridos, logística", DIEGO: "Talleres, ventas, coordinación, invernadero",
-        FRANCIS: "Registro, administración, sistematización", TAIS: "Talleres, plantas secas, recorridos",
-        CALA: "Cocina y snacks, compostaje, vivero"}
-    personas = [{"Persona": k, "ValorHora": v, "Ofrece": ofrece[k], "HorasMes": 20, "Nivel": "1",
-                 "Notas": "Valor estimado: cada persona debe confirmar el suyo.", "PorConfirmar": "TRUE"}
+        CHALO: "Mantención, construcción, orden del espacio", CAMILU: "Recorridos, plantas, semillas, jugos, ventas",
+        NIKO: "Cocina, recorridos (cultivo, bosquicultura, plantas medicinales, bioconstrucción, sustentabilidad), logística",
+        DIEGO: "Coordinación, talleres de reproducción de especies, ventas, invernadero",
+        FRANCIS: "Registro, administración, sistematización",
+        TAIS: "Talleres, eficiencia hídrica (OCAS, SUDS), gasfitería, presentaciones, recorridos",
+        CALA: "Cocina, compras y logística de alimentación, compostaje, vivero"}
+    notas = {
+        NIKO: "Declaró $10.000 promedio. Exigencia general 4 de 5. Prefiere repartir por horas.",
+        CALA: "Declaró $10.000 promedio. Prefiere por horas considerando el tipo de tarea. Propone no contar tareas de semanero como horas.",
+        DIEGO: "Declaró $15.000 promedio, o menos con precio diferenciado según para quién trabaje.",
+        TAIS: "Declaró desde $10.000 en AUCCA; en su empleo $10.000 a $30.000 según especialidad. Su traslado de 2 h no está en sus horas.",
+        CAMILU: "No dio una cifra: depende de a quién le trabaja y en qué. Valor estimado.",
+        CHALO: "Ese día cumplió solo tareas de semanero. Valor estimado.",
+        FRANCIS: "Valor estimado: cada persona debe confirmar el suyo."}
+    personas = [{"Persona": k, "ValorHora": v[0], "Ofrece": ofrece[k], "HorasMes": 20, "Nivel": "1",
+                 "Notas": notas[k], "PorConfirmar": "TRUE" if v[1] else "FALSE"}
                 for k, v in tarifas.items()]
     import json
     from secciones import coop_motor as M
@@ -121,6 +139,12 @@ def datos_proyecto_inicial() -> dict[str, list[dict]]:
             "Se habló de partir con 10% desde el próximo año; el costo real es mayor.", "En conversación", "Todo el grupo", rev="2027-03-01"),
         gob("g8", "Acuerdo", "Venta de plantas: 50% productor/a, 25% vendedor/a, 25% espacio", "Producción",
             "Acordado el 8 de noviembre; se afinará por producto.", "Acordada", "Todo el grupo", fecha="2026-11-08", rev="2027-03-01"),
+        gob("g9", "Tensión", "¿Qué tareas son de semanero y cuáles del proyecto?", "Espacio",
+            "Cala propone no contar como horas de trabajo las tareas de semanero. Hay que definir cuáles de orden y limpieza lo son.",
+            "Abierta", fecha="2026-11-23"),
+        gob("g10", "Propuesta", "Ofrecer estas jornadas de forma regular, con publicidad", "Difusión",
+            "Propuesta de Tais para generar más ingresos a la economía comunitaria e individual. Lo presentará en la próxima reunión.",
+            "Abierta", "Tais", fecha="2026-11-23"),
     ]
     return {"coop_parametros": escenarios, "coop_gobernanza": gobernanza, "coop_proyectos": proyecto, "coop_items": items, "coop_ventas": ventas,
             "coop_produccion": produccion, "coop_costos": costos, "coop_registro": registro,

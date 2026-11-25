@@ -193,3 +193,36 @@ def sembrar_proyecto_inicial() -> None:
 def instalacion_nueva() -> bool:
     """True si todavía no hay proyectos, escenarios ni horas (primera vez que se abre el módulo)."""
     return all(cargar(t).empty for t in ("coop_proyectos", "coop_parametros", "coop_registro"))
+
+
+def migrar_a_datos_reales() -> bool:
+    """Reemplaza las estimaciones de la primera carga por los datos reales de la visita del 13 de nov.
+
+    Solo actúa si el registro de horas del proyecto sigue siendo exactamente el de la primera carga
+    (mismos IDs y todo «Estimado»): así nunca pisa lo que alguien haya editado. Devuelve True si cambió algo.
+    """
+    from secciones.coop_inicial import IDS_REGISTRO_ESTIMADO, PID, datos_proyecto_inicial
+    reg = cargar_proyecto("coop_registro", PID)
+    if reg.empty or not set(reg["ID"]) <= IDS_REGISTRO_ESTIMADO:
+        return False
+    if not reg["Origen"].str.lower().str.startswith(("sim", "estim")).all():
+        return False
+    nuevos = datos_proyecto_inicial()
+    for tabla in ("coop_items", "coop_ventas", "coop_produccion", "coop_costos", "coop_registro"):
+        actual = cargar(tabla, fresco=True)
+        resto = actual[actual["ProyectoID"] != PID]
+        propios = _normalizar(tabla, pd.DataFrame(nuevos[tabla])) if nuevos[tabla] else _vacio(tabla)
+        _escribir_todo(tabla, pd.concat([resto, propios], ignore_index=True))
+    personas = cargar("coop_personas", fresco=True)
+    nuevas = _normalizar("coop_personas", pd.DataFrame(nuevos["coop_personas"]))
+    personas = pd.concat([personas[~personas["Persona"].isin(nuevas["Persona"])], nuevas], ignore_index=True)
+    _escribir_todo("coop_personas", personas)
+    proy = cargar("coop_proyectos", fresco=True)
+    proy.loc[proy["ID"] == PID, "Descripcion"] = nuevos["coop_proyectos"][0]["Descripcion"]
+    _escribir_todo("coop_proyectos", proy)
+    gob = cargar("coop_gobernanza", fresco=True)
+    faltan = _normalizar("coop_gobernanza", pd.DataFrame(nuevos["coop_gobernanza"]))
+    faltan = faltan[~faltan["ID"].isin(gob["ID"])]
+    if not faltan.empty:
+        _escribir_todo("coop_gobernanza", pd.concat([gob, faltan], ignore_index=True))
+    return True

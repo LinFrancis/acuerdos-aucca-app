@@ -1,17 +1,21 @@
+import copy
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import pandas as pd
 import pytest
 from secciones import coop_motor as M
-from secciones.coop_inicial import datos_proyecto_inicial, DIEGO, CALA, TAIS, CAMILU, NIKO
+from secciones.coop_inicial import datos_proyecto_inicial, DIEGO, CALA, TAIS, CAMILU, NIKO, CHALO, PID
 
 D = datos_proyecto_inicial()
 
 
-def correr(**p):
+def correr(registro=None, produccion=None, costos=None, **p):
     params = M.params_completos({})
     params.update(p)
-    return M.calcular(D["coop_proyectos"][0], D["coop_items"], D["coop_ventas"], D["coop_produccion"],
-                      D["coop_registro"], D["coop_costos"], D["coop_personas"], params)
+    return M.calcular(D["coop_proyectos"][0], D["coop_items"], D["coop_ventas"],
+                      D["coop_produccion"] if produccion is None else produccion,
+                      D["coop_registro"] if registro is None else registro,
+                      D["coop_costos"] if costos is None else costos, D["coop_personas"], params)
 
 
 def test_repartir_conserva_el_total():
@@ -20,31 +24,57 @@ def test_repartir_conserva_el_total():
     assert M.repartir(100, {}) == {}
 
 
-def test_ingresos_del_dia_13():
+def test_ingresos_y_gastos_declarados():
     r = correr()["resumen"]
-    assert r["ingreso_servicios"] == 512000            # $16.000 × 32 (acta 8 nov)
-    assert r["ingreso_productos"] == 15 * 3500 + 6 * 2500 + 12 * 1000   # 79.500
-    assert r["costos_total"] == 108000
+    assert r["ingreso_servicios"] == 512000            # $16.000 × 32 (acta 8 nov), líquido en cuenta AUCCA
+    assert r["ingreso_productos"] == 12500 + 16000     # ventas declaradas por Diego
+    assert r["costos_total"] == 57278 + 2400           # compras de Cala + masas de Nico (incluidas) + traslado de Tais
 
 
-def test_cascada_servicios():
+def test_compras_de_cala_y_nico_suman_57278():
+    c = pd.DataFrame(D["coop_costos"])
+    compras = c[c["PagadoPor"].isin([CALA, NIKO])]["Monto"].sum()
+    assert compras == 57278
+    assert c[c["ItemID"] == "s-snack"]["Monto"].sum() == 28753
+    assert c[c["ItemID"] == "s-almuerzo"]["Monto"].sum() == 28525
+
+
+def test_horas_declaradas_por_persona():
+    p = correr()["personas"].set_index("Persona")["Horas"]
+    assert p[NIKO] == pytest.approx(10.33)
+    assert p[CALA] == pytest.approx(6.75)
+    assert p[DIEGO] == 13
+    assert p[TAIS] == pytest.approx(8.4)
+    assert p[CAMILU] == 6
+    assert CHALO not in p.index or p[CHALO] == 0
+    assert correr()["resumen"]["horas_totales"] == pytest.approx(44.48)
+
+
+def test_cascada_servicios_sin_mezclar_plantas():
     r = correr()["resumen"]
-    margen = 512000 - 108000
-    assert r["margen_servicios"] == margen
+    margen = 512000 - 59678
+    assert r["margen_servicios"] == margen             # las plantas no entran al margen de servicios
     assert r["reserva_espacio"] == round(margen * 0.15)
     assert r["fondo_comun"] == round(margen * 0.10)
     assert r["excedente_bolsa"] == margen - r["reserva_espacio"] - r["fondo_comun"]
 
 
-def test_productos_50_25_25():
+def test_plantas_sin_productores_quedan_sin_asignar():
     res = correr()
+    r = res["resumen"]
+    assert r["sin_asignar"] == pytest.approx(0.5 * 28500, abs=1)
+    assert r["productos_a_espacio"] == pytest.approx(0.25 * 28500, abs=1)
+    assert any("sin productor" in a.lower() for a in res["alertas"])
     p = res["personas"].set_index("Persona")
-    assert p.loc[TAIS, "Como productor/a"] == pytest.approx(0.5 * 15000 * 6 / 10, abs=1)
-    assert p.loc[CAMILU, "Como productor/a"] == pytest.approx(0.5 * 15000 * 4 / 10 + 0.5 * 12000, abs=1)
-    assert p.loc[DIEGO, "Como productor/a"] == pytest.approx(0.5 * 52500 * 12 / 20, abs=1)
-    assert p.loc[CALA, "Como productor/a"] == pytest.approx(0.5 * 52500 * 8 / 20, abs=1)
-    assert p.loc[CALA, "Como vendedor/a"] == pytest.approx(0.25 * 21000, abs=1)   # vendió 6 vivas
-    assert res["resumen"]["productos_a_espacio"] == pytest.approx(0.25 * 79500, abs=2)
+    assert p.loc[DIEGO, "Como vendedor/a"] == pytest.approx(0.25 * 28500, abs=1)
+
+
+def test_plantas_50_25_25_con_produccion():
+    prod = [{"ID": "x1", "ProyectoID": PID, "ItemID": "p-viva", "Persona": DIEGO, "Cantidad": 12, "PorConfirmar": "FALSE"},
+            {"ID": "x2", "ProyectoID": PID, "ItemID": "p-viva", "Persona": CALA, "Cantidad": 8, "PorConfirmar": "FALSE"}]
+    p = correr(produccion=prod)["personas"].set_index("Persona")
+    assert p.loc[DIEGO, "Como productor/a"] == pytest.approx(0.5 * 16000 * 12 / 20, abs=1)
+    assert p.loc[CALA, "Como productor/a"] == pytest.approx(0.5 * 16000 * 8 / 20, abs=1)
 
 
 @pytest.mark.parametrize("metodo", list(M.METODOS))
@@ -52,9 +82,8 @@ def test_todos_los_metodos_cuadran(metodo):
     res = correr(metodo=metodo)
     r = res["resumen"]
     assert res["balance_ok"], r
-    prod = res["personas"]["Como productor/a"].sum() + res["personas"]["Como vendedor/a"].sum()
-    assert res["comparacion"][metodo].sum() - prod == r["excedente_bolsa"]
-    assert r["reserva_espacio"] + r["fondo_comun"] + r["productos_a_espacio"] + r["pagos_trabajo"] \
+    assert r["diferencia_cuadratura"] == 0
+    assert r["aporte_a_aucca"] + r["fondo_comun"] + r["pagos_trabajo"] + r["sin_asignar"] \
         == r["ingreso_total"] - r["costos_total"]
 
 
@@ -68,18 +97,27 @@ def test_parametros_cambian_resultados():
     assert correr(pct_espacio=30.0)["resumen"]["excedente_bolsa"] < correr()["resumen"]["excedente_bolsa"]
 
 
-def test_aporte_y_reembolsos():
-    p = correr()["personas"].set_index("Persona")
-    assert p.loc[NIKO, "Reembolso de gastos"] == 45000
-    assert p.loc[NIKO, "Aporte en servicios ($)"] > 0
-    assert p.loc[DIEGO, "Aporte en productos ($)"] > 0
-    assert p["% del ingreso generado"].sum() <= 100.5
+def test_reembolsos_ya_pagados_y_pendientes():
+    assert correr()["resumen"]["reembolsos"] == 0       # todos declararon que ya les devolvieron
+    pend = copy.deepcopy(D["coop_costos"])
+    for c in pend:
+        c["Reembolsado"] = "FALSE"
+    p = correr(costos=pend)["personas"].set_index("Persona")
+    assert p.loc[NIKO, "Reembolso de gastos"] == 12000
+    assert p.loc[CALA, "Reembolso de gastos"] == 45278
 
 
 def test_horas_de_productos_no_entran_a_la_bolsa():
-    p = correr()["personas"].set_index("Persona")
-    assert p.loc[DIEGO, "Horas en productos"] == 9
-    assert p.loc[DIEGO, "Horas"] == 5.5 + 2 + 3 + 3
+    reg = copy.deepcopy(D["coop_registro"])
+    reg.append({"ID": "z1", "ProyectoID": PID, "Persona": DIEGO, "Tarea": "Puesto de plantas", "ItemID": "p-viva",
+                "Horas": 4, "Nivel": 1, "Esfuerzo": "", "Origen": "Real", "Evidencia": ""})
+    p = correr(registro=reg)["personas"].set_index("Persona")
+    assert p.loc[DIEGO, "Horas en productos"] == 4
+    assert p.loc[DIEGO, "Horas"] == 13
+
+
+def test_datos_por_confirmar_se_marcan():
+    assert correr()["resumen"]["por_confirmar"] is True   # horas de Camilú y Diego sin desglose
 
 
 def test_sin_horas_alerta():
@@ -94,3 +132,24 @@ def test_plan_escala_con_asistentes():
     assert p2["resumen"]["ingreso_servicios"] == p1["resumen"]["ingreso_servicios"] // 2
     assert p1["resumen"]["valor_hora_estimado"] > 0
     assert not p1["equilibrio"].empty
+
+
+def test_migracion_de_estimaciones_a_datos_reales(tmp_path, monkeypatch):
+    from secciones import coop_datos as CD
+    monkeypatch.setattr(CD, "_LOCAL", tmp_path)
+    monkeypatch.setattr(CD, "usa_sheets", lambda: False)
+    # instalación vieja: solo hay horas estimadas de la primera carga
+    vieja = [{"ID": f"r{n}", "ProyectoID": PID, "Persona": DIEGO, "Tarea": "x", "ItemID": "", "Horas": 1,
+              "Nivel": "1", "Esfuerzo": "", "Origen": "Estimado", "Evidencia": ""} for n in range(1, 21)]
+    CD._escribir_todo("coop_registro", pd.DataFrame(vieja))
+    CD._escribir_todo("coop_proyectos", pd.DataFrame(D["coop_proyectos"]))
+    assert CD.migrar_a_datos_reales() is True
+    reg = CD.cargar_proyecto("coop_registro", PID)
+    assert reg["ID"].str.startswith("rh").all() and len(reg) == len(D["coop_registro"])
+    assert CD.cargar_proyecto("coop_costos", PID)["Monto"].astype(int).sum() == 59678
+    assert len(CD.cargar("coop_personas")) == 7
+    # una segunda vez no hace nada
+    assert CD.migrar_a_datos_reales() is False
+    # y no pisa datos que alguien ya editó
+    CD._escribir_todo("coop_registro", pd.DataFrame(vieja[:1] + [dict(vieja[1], Origen="Real")]))
+    assert CD.migrar_a_datos_reales() is False
