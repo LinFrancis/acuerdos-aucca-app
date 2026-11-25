@@ -334,3 +334,28 @@ def migrar_talleres_diego_camilu() -> bool:
 def M_num(x) -> float:
     from secciones.coop_motor import num
     return num(x)
+
+
+def migrar_productores_plantas() -> bool:
+    """Registra quién produjo las plantas vendidas el 13: vivas → Diego, secas → Cala. Solo completa
+    lo que está vacío en la hoja (ventas v1 y v2 y las líneas de plantas); no pisa lo que ya se cargó."""
+    from secciones.coop_inicial import PID, datos_proyecto_inicial
+    ventas = cargar("coop_ventas")
+    mis = ventas[(ventas["ProyectoID"] == PID) & ventas["ID"].isin(["v1", "v2"])]
+    if len(mis) != 2 or (mis["Productor"].astype(str).str.strip() != "").any():
+        return False
+    semilla = datos_proyecto_inicial()
+    prod = {v["ID"]: v["Productor"] for v in semilla["coop_ventas"]}
+    ventas = cargar("coop_ventas", fresco=True)
+    for vid, quien in prod.items():
+        m = (ventas["ProyectoID"] == PID) & (ventas["ID"] == vid)
+        ventas.loc[m, "Productor"] = quien
+        ventas.loc[m, "PorConfirmar"] = "FALSE"
+    _escribir_todo("coop_ventas", ventas)
+    items = cargar("coop_items", fresco=True)
+    for it in semilla["coop_items"]:
+        if it["ID"] in ("p-viva", "p-seca"):
+            m = (items["ProyectoID"] == PID) & (items["ID"] == it["ID"]) & (items["Productores"].astype(str).str.strip() == "")
+            items.loc[m, "Productores"] = it["Productores"]
+    _escribir_todo("coop_items", items)
+    return True

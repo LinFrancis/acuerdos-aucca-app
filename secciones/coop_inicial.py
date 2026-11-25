@@ -3,7 +3,7 @@
 Los precios de los servicios y el total ($512.000 = $16.000 × 32) vienen del acta del 8 de
 noviembre. Las horas, gastos, ventas y valores de hora son los que cada persona declaró el 23 y
 24 de noviembre de 2026 (ver «Informacion_declarada_visita_13_noviembre.docx»). Lo que aún no
-entregaron (horas por tarea de Camilú, ventas de Camilú, quién produjo cada planta, valor de hora
+entregaron (horas por tarea de Camilú, ventas de Camilú, valor de hora
 de Camilú, Chalo y Francis) queda marcado como «por confirmar».
 """
 CHALO, CAMILU, NIKO, DIEGO, FRANCIS, TAIS, CALA = (
@@ -38,18 +38,19 @@ def datos_proyecto_inicial() -> dict[str, list[dict]]:
         serv("s-snack", "Snack / coffee", "Snack media mañana (sándwich + jugo)", 3000, 5),
         serv("s-talleres", "Taller", "2 talleres: eficiencia hídrica y propagación de nativas", 6000, 11),
         serv("s-almuerzo", "Alimentación (servicio)", "Empanada de vegetales + jugo (cierre)", 4000, 11),
-        prod("p-viva", "Planta viva", "Plantas vivas del invernadero", 3500, 20, "", "", 0),
-        prod("p-seca", "Planta seca", "Plantas secas (arreglos)", 2500, 10, "", "", 0),
+        prod("p-viva", "Planta viva", "Plantas vivas del invernadero", 3500, 20, DIEGO, "", 0),
+        prod("p-seca", "Planta seca", "Plantas secas (arreglos)", 2500, 10, CALA, "", 0),
         prod("p-semillas", "Semillas", "Sobres de semillas", 1000, 15, "", "", 0),
     ]
     # Ventas declaradas por Diego: $12.500 en plantas secas y $16.000 en plantas vivas. Cada total se
     # registra como una venta agrupada (cantidad 1 × monto) porque no declaró las unidades.
     # El detalle de ventas de Camilú del día 13 aún no existe.
-    ventas = [("p-seca", 1, 12500, DIEGO), ("p-viva", 1, 16000, DIEGO)]
+    # Quién produjo: las plantas vivas las produjo Diego y las secas Cala. Quien vendió se lleva el % de vendedor/a.
+    ventas = [("p-seca", 1, 12500, DIEGO, CALA), ("p-viva", 1, 16000, DIEGO, DIEGO)]
     ventas = [{"ID": f"v{n}", "ProyectoID": PID, "ItemID": a, "Cantidad": b, "PrecioUnit": c,
-               "Vendedor": d, "Productor": "", "Medio": "", "Fecha": "2026-11-13", "PorConfirmar": "TRUE"}
-              for n, (a, b, c, d) in enumerate(ventas, 1)]
-    produccion = []   # nadie ha declarado quién produjo cada planta
+               "Vendedor": d, "Productor": e, "Medio": "", "Fecha": "2026-11-13", "PorConfirmar": "FALSE"}
+              for n, (a, b, c, d, e) in enumerate(ventas, 1)]
+    produccion = []   # no se registraron unidades: el productor se indica por venta
     # Gastos: compras de Cala ($57.278 en total, con el detalle por preparación que ella entregó),
     # masas de Nico y traslado de Tais. Todos ya reembolsados, ninguno con boleta.
     costos = [

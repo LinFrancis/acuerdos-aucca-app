@@ -9,10 +9,10 @@ from secciones.coop_inicial import datos_proyecto_inicial, DIEGO, CALA, TAIS, CA
 D = datos_proyecto_inicial()
 
 
-def correr(registro=None, produccion=None, costos=None, **p):
+def correr(registro=None, produccion=None, costos=None, ventas=None, **p):
     params = M.params_completos({})
     params.update(p)
-    return M.calcular(D["coop_proyectos"][0], D["coop_items"], D["coop_ventas"],
+    return M.calcular(D["coop_proyectos"][0], D["coop_items"], D["coop_ventas"] if ventas is None else ventas,
                       D["coop_produccion"] if produccion is None else produccion,
                       D["coop_registro"] if registro is None else registro,
                       D["coop_costos"] if costos is None else costos, D["coop_personas"], params)
@@ -59,22 +59,39 @@ def test_cascada_servicios_sin_mezclar_plantas():
     assert r["excedente_bolsa"] == margen - r["reserva_espacio"] - r["fondo_comun"]
 
 
-def test_plantas_sin_productores_quedan_sin_asignar():
+def test_plantas_vivas_diego_secas_cala_y_vendedor_se_lleva_su_porcentaje():
     res = correr()
     r = res["resumen"]
-    assert r["sin_asignar"] == pytest.approx(0.5 * 28500, abs=1)
-    assert r["productos_a_espacio"] == pytest.approx(0.25 * 28500, abs=1)
-    assert any("sin productor" in a.lower() for a in res["alertas"])
     p = res["personas"].set_index("Persona")
-    assert p.loc[DIEGO, "Como vendedor/a"] == pytest.approx(0.25 * 28500, abs=1)
+    # vivas $16.000 (productor Diego, vendió Diego) · secas $12.500 (productora Cala, vendió Diego)
+    assert p.loc[DIEGO, "Como productor/a"] == 8000                    # 50 % de las vivas
+    assert p.loc[CALA, "Como productor/a"] == pytest.approx(6250, abs=1)   # 50 % de las secas
+    assert p.loc[DIEGO, "Como vendedor/a"] == pytest.approx(0.25 * 28500, abs=1)   # vendió todo: 25 %
+    assert p.loc[CALA, "Como vendedor/a"] == 0
+    assert r["productos_a_espacio"] == pytest.approx(0.25 * 28500, abs=1)
+    assert r["sin_asignar"] == 0
+    assert not any("sin productor" in a.lower() for a in res["alertas"])
 
 
-def test_plantas_50_25_25_con_produccion():
+def test_otro_vendedor_se_lleva_el_porcentaje_de_vendedor():
+    ventas = copy.deepcopy(D["coop_ventas"])
+    ventas[1]["Vendedor"] = CAMILU                                    # las vivas las vendió Camilú
+    p = correr(ventas=ventas)["personas"].set_index("Persona")
+    assert p.loc[CAMILU, "Como vendedor/a"] == 4000                   # 25 % de $16.000
+    assert p.loc[DIEGO, "Como vendedor/a"] == pytest.approx(3125, abs=1)   # 25 % de las secas
+    assert p.loc[DIEGO, "Como productor/a"] == 8000
+
+
+def test_plantas_50_25_25_con_produccion_por_unidades():
+    ventas = copy.deepcopy(D["coop_ventas"])
+    for v in ventas:
+        v["Productor"] = ""                                            # sin indicar productor por venta
     prod = [{"ID": "x1", "ProyectoID": PID, "ItemID": "p-viva", "Persona": DIEGO, "Cantidad": 12, "PorConfirmar": "FALSE"},
             {"ID": "x2", "ProyectoID": PID, "ItemID": "p-viva", "Persona": CALA, "Cantidad": 8, "PorConfirmar": "FALSE"}]
-    p = correr(produccion=prod)["personas"].set_index("Persona")
+    p = correr(produccion=prod, ventas=ventas)["personas"].set_index("Persona")
     assert p.loc[DIEGO, "Como productor/a"] == pytest.approx(0.5 * 16000 * 12 / 20, abs=1)
-    assert p.loc[CALA, "Como productor/a"] == pytest.approx(0.5 * 16000 * 8 / 20, abs=1)
+    # Cala: 8 de 20 de las vivas + toda la parte de productora de las secas
+    assert p.loc[CALA, "Como productor/a"] == pytest.approx(0.5 * 16000 * 8 / 20 + 0.5 * 12500, abs=1)
 
 
 @pytest.mark.parametrize("metodo", list(M.METODOS))
@@ -229,7 +246,7 @@ def test_pendientes_con_tablas_vacias_desde_sheets(monkeypatch):
     CD._CACHE.update(t=0.0, datos={}, ws={})
     CD.restaurar_proyecto_inicial()
     pend = C._pendientes(PID)
-    assert pend["producción"] == 0 and pend["horas"] == 4 and pend["ventas"] == 2
+    assert pend["producción"] == 0 and pend["horas"] == 4 and pend["ventas"] == 0
     CD._CACHE.update(t=0.0, datos={}, ws={})
 
 
@@ -242,7 +259,8 @@ def test_observaciones_explican_los_datos():
     assert "$28.500" in ctx
     assert DIEGO in ctx and CAMILU in ctx          # sus horas aún están estimadas / sin desglosar
     d = " ".join(O.obs_escenario(M.params_completos({"metodo": "D"}), res))
-    assert "Depende de a qué línea" in d and "$14.250" in d
+    assert "Depende de a qué línea" in d
+    assert "Reparto de las plantas vendidas" in ctx and "$8.000" in ctx
     e = " ".join(O.obs_escenario(M.params_completos({"metodo": "E"}), correr(metodo="E")))
     assert "mismo" in e or "Ignora las horas" in e
 
@@ -286,3 +304,23 @@ def test_migracion_de_talleres_en_hoja_existente(tmp_path, monkeypatch):
     assert reg[reg["Persona"] == DIEGO]["Horas"].astype(float).sum() == 13
     assert reg[reg["Persona"] == CAMILU]["Horas"].astype(float).sum() == 6
     assert CD.migrar_talleres_diego_camilu() is False        # no se repite
+
+
+def test_migracion_de_productores_de_plantas(tmp_path, monkeypatch):
+    from secciones import coop_datos as CD
+    monkeypatch.setattr(CD, "_LOCAL", tmp_path)
+    monkeypatch.setattr(CD, "usa_sheets", lambda: False)
+    ventas = copy.deepcopy(D["coop_ventas"])
+    for v in ventas:
+        v["Productor"], v["PorConfirmar"] = "", "TRUE"
+    items = copy.deepcopy(D["coop_items"])
+    for i in items:
+        i["Productores"] = ""
+    CD._escribir_todo("coop_ventas", pd.DataFrame(ventas))
+    CD._escribir_todo("coop_items", pd.DataFrame(items))
+    assert CD.migrar_productores_plantas() is True
+    v = CD.cargar_proyecto("coop_ventas", PID).set_index("ID")
+    assert v.loc["v2", "Productor"] == DIEGO and v.loc["v1", "Productor"] == CALA
+    it = CD.cargar_proyecto("coop_items", PID).set_index("ID")
+    assert it.loc["p-viva", "Productores"] == DIEGO and it.loc["p-seca", "Productores"] == CALA
+    assert CD.migrar_productores_plantas() is False                      # no se repite ni pisa

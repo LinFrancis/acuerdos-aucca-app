@@ -53,6 +53,15 @@ def obs_contexto(personas: pd.DataFrame, r: dict, registro: pd.DataFrame, costos
     if r["ingreso_productos"] > 0:
         obs.append(f"Las ventas de plantas registradas ({clp(r['ingreso_productos'])}) están a nombre de {_lista(vend) or 'nadie'}. "
                    "Si otra persona también vendió, esas ventas todavía no están cargadas.")
+    if r["ingreso_productos"] > 0:
+        prod = personas[personas["Como productor/a"] > 0]
+        vend_ = personas[personas["Como vendedor/a"] > 0]
+        if not prod.empty or not vend_.empty:
+            obs.append("Reparto de las plantas vendidas (se calcula aparte de los servicios): como productor/a "
+                       + (", ".join(f"{f['Persona']} {clp(f['Como productor/a'])}" for _, f in prod.iterrows()) or "nadie")
+                       + "; como vendedor/a "
+                       + (", ".join(f"{f['Persona']} {clp(f['Como vendedor/a'])}" for _, f in vend_.iterrows()) or "nadie")
+                       + f"; para el espacio (AUCCA) {clp(r['productos_a_espacio'])}.")
     if not costos.empty:
         propios = costos[costos["PagadoPor"].astype(str).str.strip() != ""]
         total = sum(M.num(x) for x in propios["Monto"])
