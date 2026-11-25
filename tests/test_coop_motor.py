@@ -199,3 +199,22 @@ def test_sheets_lee_todo_junto_y_no_relee_al_escribir(monkeypatch):
     assert libro.hojas["coop_personas"].filas[1][0] == "Ana"
     assert libro.lecturas == 2                     # escribir y volver a leer no gasta cuota
     CD._CACHE.update(t=0.0, datos={}, ws={})
+
+
+def test_restaurar_proyecto_si_no_esta(tmp_path, monkeypatch):
+    from secciones import coop_datos as CD
+    monkeypatch.setattr(CD, "_LOCAL", tmp_path)
+    monkeypatch.setattr(CD, "usa_sheets", lambda: False)
+    assert CD.proyecto_inicial_presente() is False
+    CD.restaurar_proyecto_inicial()
+    assert CD.proyecto_inicial_presente() is True
+    assert len(CD.cargar_proyecto("coop_registro", PID)) == len(D["coop_registro"])
+    assert len(CD.cargar_proyecto("coop_costos", PID)) == len(D["coop_costos"])
+    # repetirlo no duplica nada
+    CD.restaurar_proyecto_inicial()
+    assert len(CD.cargar_proyecto("coop_registro", PID)) == len(D["coop_registro"])
+    assert len(CD.cargar("coop_proyectos")) == 1
+    # si el proyecto se borra pero quedan filas huérfanas, se conservan
+    CD._escribir_todo("coop_proyectos", pd.DataFrame(columns=CD.TABLAS["coop_proyectos"]))
+    CD.restaurar_proyecto_inicial()
+    assert len(CD.cargar_proyecto("coop_registro", PID)) == len(D["coop_registro"])

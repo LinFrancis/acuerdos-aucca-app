@@ -279,3 +279,33 @@ def completar_gobernanza_inicial() -> bool:
     nuevas = nuevas[nuevas["ID"].isin(["g9", "g10"])]
     _escribir_todo("coop_gobernanza", pd.concat([gob, nuevas], ignore_index=True))
     return True
+
+
+def proyecto_inicial_presente() -> bool:
+    from secciones.coop_inicial import PID
+    return PID in cargar("coop_proyectos")["ID"].tolist()
+
+
+def restaurar_proyecto_inicial() -> None:
+    """Vuelve a crear el proyecto de la visita del 13 de noviembre si no está en la hoja.
+
+    Solo agrega: si el proyecto ya tiene horas, ventas, costos u otras filas, las conserva; solo
+    completa lo que falta con los datos declarados. No toca otros proyectos."""
+    from secciones.coop_inicial import PID, datos_proyecto_inicial
+    semilla = datos_proyecto_inicial()
+    proy = cargar("coop_proyectos", fresco=True)
+    if PID not in proy["ID"].tolist():
+        fila = _normalizar("coop_proyectos", pd.DataFrame(semilla["coop_proyectos"]))
+        _escribir_todo("coop_proyectos", pd.concat([proy, fila], ignore_index=True))
+    migrar_a_datos_reales()   # si solo había estimaciones de la primera carga, las reemplaza
+    for tabla in ("coop_items", "coop_ventas", "coop_produccion", "coop_costos", "coop_registro"):
+        if semilla[tabla] and cargar_proyecto(tabla, PID).empty:
+            actual = cargar(tabla, fresco=True)
+            nuevas = _normalizar(tabla, pd.DataFrame(semilla[tabla]))
+            _escribir_todo(tabla, pd.concat([actual, nuevas], ignore_index=True))
+    for tabla, clave in (("coop_personas", "Persona"), ("coop_parametros", "ID"), ("coop_gobernanza", "ID")):
+        actual = cargar(tabla, fresco=True)
+        nuevas = _normalizar(tabla, pd.DataFrame(semilla[tabla]))
+        nuevas = nuevas[~nuevas[clave].isin(actual[clave])]
+        if not nuevas.empty:
+            _escribir_todo(tabla, pd.concat([actual, nuevas], ignore_index=True))

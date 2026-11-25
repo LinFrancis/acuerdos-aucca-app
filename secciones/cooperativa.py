@@ -306,6 +306,11 @@ def _sec_proyectos() -> None:
     st.caption("Cada actividad es un proyecto: se diseña, se ejecuta, se reparte y se cierra. "
                "Abre uno para ver su resumen, registrar lo que pasó y calcular los pagos.")
     proy = D.cargar("coop_proyectos")
+    if not D.proyecto_inicial_presente():
+        st.info("El proyecto de la **visita del viernes 13 de noviembre** no está en la hoja de datos.")
+        if st.button("Cargar el proyecto de la visita del 13 de noviembre", type="primary", key="restaurar_13"):
+            D.restaurar_proyecto_inicial()
+            st.rerun()
     for _, p in proy.iterrows():
         res = _calcular(p["ID"], _params_de(p["Escenario"]))
         r = res["resumen"]
