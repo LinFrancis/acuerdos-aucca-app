@@ -392,9 +392,85 @@ def _sec_registro(pid: str) -> None:
                   "se pagan por el % productor/vendedor.")
 
 
+def _resultados_todos(pid: str, p: dict) -> None:
+    """Una tabla por escenario: cuánto recibe cada persona y cuánto aportó, para comparar lado a lado."""
+    esc = D.cargar("coop_parametros")
+    if esc.empty:
+        escenarios = [("", "Parámetros base", "")]
+    else:
+        escenarios = [(r["ID"], r["Nombre"], r["Estado"]) for _, r in esc.iterrows()]
+    calculos = []
+    for eid, nombre, estado in escenarios:
+        prm = _params_de(eid)
+        calculos.append((eid, nombre, estado, prm, _calcular(pid, prm)))
+
+    # comparación rápida: total que recibiría cada persona en cada escenario
+    st.markdown("#### Resumen: cuánto recibiría cada persona según el escenario")
+    base = {}
+    for _, nombre, _e, _prm, res in calculos:
+        for _, f in res["personas"].iterrows():
+            base.setdefault(f["Persona"], {})[nombre] = f["Total a recibir"]
+    if base:
+        comp = pd.DataFrame(base).T.fillna(0)
+        comp = comp.loc[(comp != 0).any(axis=1)]
+        comp.loc["TOTAL"] = comp.sum()
+        comp = comp.reset_index().rename(columns={"index": "Persona"})
+        for c in comp.columns[1:]:
+            comp[c] = comp[c].map(clp)
+        st.dataframe(comp, hide_index=True, use_container_width=True)
+        st.caption("Incluye reembolsos de gastos. Abajo está el detalle de cada escenario.")
+    else:
+        st.info("Aún no hay personas con horas, ventas o producción registradas.")
+
+    largo = []
+    for eid, nombre, estado, prm, res in calculos:
+        r = res["resumen"]
+        pers = res["personas"]
+        with st.container(border=True):
+            st.markdown(f"#### {nombre}")
+            st.caption(f"{('Estado: **' + estado + '** · ') if estado else ''}método: **{M.METODOS[r['metodo']]}** · "
+                       f"espacio {prm['pct_espacio']:g}% · fondo común {prm['pct_fondo_comun']:g}%")
+            if pers.empty:
+                st.info("Sin personas con horas, ventas o producción.")
+            else:
+                v = pers[["Persona", "Horas", "Pago por trabajo", "Reembolso de gastos", "Total a recibir",
+                          "Aporte total ($)", "% del ingreso generado"]].copy()
+                v = v[(v[["Horas", "Pago por trabajo", "Reembolso de gastos", "Total a recibir", "Aporte total ($)"]] != 0)
+                      .any(axis=1)]
+                for _, f in v.iterrows():
+                    largo.append({"Escenario": nombre, **f.to_dict()})
+                tot = {c: v[c].sum() for c in v.columns if c != "Persona"}
+                v = pd.concat([v, pd.DataFrame([{"Persona": "TOTAL", **tot}])], ignore_index=True)
+                for c in ("Pago por trabajo", "Reembolso de gastos", "Total a recibir", "Aporte total ($)"):
+                    v[c] = v[c].map(clp)
+                v["Horas"] = v["Horas"].map(lambda x: f"{x:g}")
+                v["% del ingreso generado"] = v["% del ingreso generado"].map(lambda x: f"{x:.1f} %")
+                v = v.rename(columns={"Pago por trabajo": "Recibe por su trabajo", "Aporte total ($)": "Aportó ($)",
+                                      "% del ingreso generado": "% de lo generado"})
+                st.dataframe(v, hide_index=True, use_container_width=True)
+            st.caption(f"Para AUCCA: **{clp(r['aporte_a_aucca'])}** · fondo común: **{clp(r['fondo_comun'])}**"
+                       + (f" · sin asignar: **{clp(r['sin_asignar'])}**" if r["sin_asignar"] else "")
+                       + ("" if res["balance_ok"] else " · ⚠️ la cuadratura no cierra"))
+    if largo:
+        st.download_button("⬇️ Descargar todos los escenarios (CSV)",
+                           pd.DataFrame(largo).to_csv(index=False).encode("utf-8-sig"),
+                           file_name=f"escenarios_{p['Nombre']}.csv", mime="text/csv")
+    st.caption("«Recibe por su trabajo» suma la parte de la bolsa de trabajo y lo que le toca como productor/a o vendedor/a. "
+               "«Aportó» es el valor de lo que generó con su trabajo: solo cuenta las horas asignadas a una línea de servicio y los "
+               "productos que produjo, así que quien tiene horas sin línea o sin producción registrada aparece con aporte menor "
+               "al real hasta completar esos datos. Para ver las cascadas y las líneas de un escenario, "
+               "elige «Un escenario en detalle».")
+
+
 def _sec_resultados(pid: str) -> None:
     p = _fila_proyecto(pid)
     st.markdown("### Resultados: cuánto recibe cada persona y cuánto aportó")
+    modo = st.radio("Ver", ["Todos los escenarios", "Un escenario en detalle"], horizontal=True,
+                    label_visibility="collapsed", key=f"res_modo_{pid}")
+    if modo == "Todos los escenarios":
+        _aviso_por_confirmar(pid)
+        _resultados_todos(pid, p)
+        return
     eid, params, estado = _selector_escenario(pid, f"esc_res_{pid}", p)
     res = _calcular(pid, params)
     r = res["resumen"]
