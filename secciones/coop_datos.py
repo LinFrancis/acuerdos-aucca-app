@@ -309,3 +309,28 @@ def restaurar_proyecto_inicial() -> None:
         nuevas = nuevas[~nuevas[clave].isin(actual[clave])]
         if not nuevas.empty:
             _escribir_todo(tabla, pd.concat([actual, nuevas], ignore_index=True))
+
+
+def migrar_talleres_diego_camilu() -> bool:
+    """Separa del bloque de horas de Diego su taller (1 h) y del de Camilú su recorrido (2 h), con la misma
+    duración que declaró Tais. Solo actúa si esas dos filas siguen tal como se cargaron (8 h y 6 h)."""
+    from secciones.coop_inicial import PID, datos_proyecto_inicial
+    reg = cargar_proyecto("coop_registro", PID)
+    if reg.empty or "rh21" in reg["ID"].tolist():
+        return False
+    horas = {r["ID"]: M_num(r["Horas"]) for _, r in reg.iterrows()}
+    if horas.get("rh14") != 8 or horas.get("rh20") != 6:
+        return False
+    semilla = {r["ID"]: r for r in datos_proyecto_inicial()["coop_registro"]}
+    actual = cargar("coop_registro", fresco=True)
+    for rid in ("rh14", "rh20"):
+        for col, val in semilla[rid].items():
+            actual.loc[actual["ID"] == rid, col] = str(val)
+    nuevas = _normalizar("coop_registro", pd.DataFrame([semilla["rh21"], semilla["rh22"]]))
+    _escribir_todo("coop_registro", pd.concat([actual, nuevas], ignore_index=True))
+    return True
+
+
+def M_num(x) -> float:
+    from secciones.coop_motor import num
+    return num(x)

@@ -229,7 +229,7 @@ def test_pendientes_con_tablas_vacias_desde_sheets(monkeypatch):
     CD._CACHE.update(t=0.0, datos={}, ws={})
     CD.restaurar_proyecto_inicial()
     pend = C._pendientes(PID)
-    assert pend["producción"] == 0 and pend["horas"] == 2 and pend["ventas"] == 2
+    assert pend["producción"] == 0 and pend["horas"] == 4 and pend["ventas"] == 2
     CD._CACHE.update(t=0.0, datos={}, ws={})
 
 
@@ -240,9 +240,9 @@ def test_observaciones_explican_los_datos():
     ctx = " ".join(O.obs_contexto(pers, res["resumen"], pd.DataFrame(D["coop_registro"]), pd.DataFrame(D["coop_costos"])))
     assert "44,48" in ctx and "Todos ya fueron devueltos" in ctx and "Ninguno tiene boleta" in ctx
     assert "$28.500" in ctx
-    assert DIEGO in ctx and CAMILU in ctx          # horas sin línea: aporte en $0
+    assert DIEGO in ctx and CAMILU in ctx          # sus horas aún están estimadas / sin desglosar
     d = " ".join(O.obs_escenario(M.params_completos({"metodo": "D"}), res))
-    assert "parte compartida" in d and "$14.250" in d
+    assert "Depende de a qué línea" in d and "$14.250" in d
     e = " ".join(O.obs_escenario(M.params_completos({"metodo": "E"}), correr(metodo="E")))
     assert "mismo" in e or "Ignora las horas" in e
 
@@ -252,3 +252,37 @@ def test_observaciones_comparativo():
     tabla = pd.DataFrame({"A": {"x": 100, "y": 50}, "B": {"x": 60, "y": 90}})
     txt = " ".join(O.obs_comparativo(tabla, [150, 150]))
     assert "misma plata" in txt and "más cambia" in txt
+
+
+def test_taller_de_diego_y_recorrido_de_camilu_duran_como_los_de_tais():
+    reg = pd.DataFrame(D["coop_registro"])
+    reg["Horas"] = reg["Horas"].astype(float)
+    tais_rec = reg[(reg["Persona"] == TAIS) & (reg["ItemID"] == "s-recorrido")]["Horas"].sum()
+    tais_tal = reg[(reg["Persona"] == TAIS) & (reg["ItemID"] == "s-talleres")]["Horas"].sum()
+    assert tais_rec == 2 and tais_tal == 2           # recorrido 2 h; 2 talleres de 1 h
+    assert reg[(reg["Persona"] == CAMILU) & (reg["ItemID"] == "s-recorrido")]["Horas"].sum() == tais_rec
+    assert reg[(reg["Persona"] == DIEGO) & (reg["ItemID"] == "s-talleres")]["Horas"].sum() == tais_tal / 2
+    # el total de horas de cada uno no cambia: solo se separó del bloque
+    assert reg[reg["Persona"] == DIEGO]["Horas"].sum() == 13
+    assert reg[reg["Persona"] == CAMILU]["Horas"].sum() == 6
+    p = correr()["personas"].set_index("Persona")
+    assert p.loc[DIEGO, "Aporte en servicios ($)"] > 0 and p.loc[CAMILU, "Aporte en servicios ($)"] > 0
+
+
+def test_migracion_de_talleres_en_hoja_existente(tmp_path, monkeypatch):
+    from secciones import coop_datos as CD
+    monkeypatch.setattr(CD, "_LOCAL", tmp_path)
+    monkeypatch.setattr(CD, "usa_sheets", lambda: False)
+    vieja = copy.deepcopy(D["coop_registro"])[:20]
+    for r in vieja:
+        if r["ID"] == "rh14":
+            r["Horas"] = 8
+        if r["ID"] == "rh20":
+            r["Horas"] = 6
+    CD._escribir_todo("coop_registro", pd.DataFrame(vieja))
+    assert CD.migrar_talleres_diego_camilu() is True
+    reg = CD.cargar_proyecto("coop_registro", PID)
+    assert len(reg) == 22
+    assert reg[reg["Persona"] == DIEGO]["Horas"].astype(float).sum() == 13
+    assert reg[reg["Persona"] == CAMILU]["Horas"].astype(float).sum() == 6
+    assert CD.migrar_talleres_diego_camilu() is False        # no se repite

@@ -76,15 +76,18 @@ def datos_proyecto_inicial() -> dict[str, list[dict]]:
         (CALA, "Montaje de la mesa de alimentación", "", 0.5, 1, 1, "Real"),
         (DIEGO, "Coordinación, planificación y propuesta del documento de la visita", "", 3, 2, "", "Real"),
         (DIEGO, "Orden del invernadero y del patio", "", 2, 1, "", "Real"),
-        # Horas juntas: puesto/ventas, sala, fotos, guardián del tiempo, taller y orden. Falta separarlas.
-        (DIEGO, "Puesto de AUCCA, sala, registro fotográfico, guardián del tiempo, taller de propagación y orden posterior (9:00–17:00)", "", 8, 2, "", "Estimado"),
+        # Horas juntas: puesto/ventas, sala, fotos, guardián del tiempo y orden (sin el taller, que va aparte). Falta separarlas.
+        (DIEGO, "Puesto de AUCCA, sala, registro fotográfico, guardián del tiempo y orden posterior (9:00–17:00, sin el taller)", "", 7, 2, "", "Estimado"),
         (TAIS, "Planificación y reunión con Diego, Nico y Camilú", "", 0.8, 2, "", "Real"),
         (TAIS, "Preparar la presentación (trabajó más de 6 h; cuenta 3)", "", 3, 3, "", "Real"),
         (TAIS, "Orden zona de hornos, limpieza de sillas, sala y baño", "", 0.6, 1, "", "Real"),
         (TAIS, "Recorrido de AUCCA", "s-recorrido", 2, 3, "", "Real"),
         (TAIS, "Dos talleres de 1 hora", "s-talleres", 2, 3, "", "Real"),
         # Camilú declaró solo su horario; falta el desglose por tarea.
-        (CAMILU, "Horario 9–15 h: recorrido guiado, limpieza de baños, jugos, lavado de loza y ventas (sin desglose)", "", 6, 2, "", "Estimado"),
+        (CAMILU, "Horario 9–15 h: limpieza de baños, jugos, lavado de loza y ventas (sin el recorrido; sin desglose)", "", 4, 2, "", "Estimado"),
+        # El recorrido cuenta como un taller y cada taller dura lo mismo que declaró Tais (recorrido 2 h, taller 1 h).
+        (DIEGO, "Taller de propagación de especies vegetales (1 h, igual que Tais por taller)", "s-talleres", 1, 3, "", "Estimado"),
+        (CAMILU, "Recorrido guiado de AUCCA (2 h, igual que Tais)", "s-recorrido", 2, 3, "", "Estimado"),
     ]
     registro = [{"ID": f"rh{n}", "ProyectoID": PID, "Persona": a, "Tarea": b, "ItemID": c, "Horas": d,
                  "Nivel": e, "Esfuerzo": f, "Origen": g, "Evidencia": ""}

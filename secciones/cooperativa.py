@@ -1055,6 +1055,8 @@ def render() -> None:
         D.sembrar_proyecto_inicial()
         st.rerun()
     D.completar_gobernanza_inicial()
+    if D.migrar_talleres_diego_camilu():
+        st.rerun()
     if D.migrar_a_datos_reales():
         # instalaciones que ya tenían las estimaciones de la primera carga: pasan a los datos declarados
         st.rerun()
