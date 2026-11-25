@@ -392,6 +392,95 @@ def _sec_registro(pid: str) -> None:
                   "se pagan por el % productor/vendedor.")
 
 
+def _describir_escenario(prm: dict, notas: str = "") -> str:
+    """Texto corto y claro de qué configura un escenario."""
+    m = prm["metodo"]
+    if m == "A":
+        met = "La bolsa de trabajo se reparte según las **horas** que trabajó cada persona, sin distinguir el tipo de tarea."
+    elif m == "B":
+        fac = ", ".join(f"nivel {n} ×{f:g}".replace(".", ",") for n, f in prm["factores_nivel"].items())
+        met = ("Las horas se multiplican por un factor según el **nivel de responsabilidad** de la tarea "
+               f"({fac}) y la bolsa se reparte según esos puntos.")
+    elif m == "C":
+        mz = prm["mezcla_c"]
+        tot = sum(mz.values()) or 1
+        met = (f"Mezcla de tres criterios: **{mz['igual'] / tot * 100:.0f}% en partes iguales**, "
+               f"**{mz['horas'] / tot * 100:.0f}% por horas** y **{mz['puntos'] / tot * 100:.0f}% por puntos** de responsabilidad.")
+    elif m == "D":
+        met = ("Cada **línea de servicio** aporta su propio resultado a la bolsa: "
+               f"el {prm['pct_bolsa_base_d']:g}% se comparte entre todas las personas según las horas de tareas de base "
+               "y el resto va a quienes trabajaron en esa línea.")
+    elif m == "E":
+        met = "La bolsa se reparte en **partes iguales** entre las personas que tienen horas registradas."
+    else:
+        met = ("La bolsa se reparte según **horas × valor de hora declarado** de cada persona "
+               f"({clp(prm['tarifa_defecto'])} por hora si alguien no declaró el suyo).")
+    res_ = (f" Antes de repartir, el {prm['pct_espacio']:g}% del margen de servicios va al espacio (AUCCA) y el "
+            f"{prm['pct_fondo_comun']:g}% al fondo común.")
+    pr = {(v["prod"], v["vend"], v["espacio"]) for v in prm["productos"].values()}
+    if len(pr) == 1:
+        a, b, c = next(iter(pr))
+        prod = f" Las plantas y productos se reparten aparte: {a:g}% quien produjo, {b:g}% quien vendió y {c:g}% el espacio (AUCCA)."
+    else:
+        prod = " Las plantas y productos se reparten aparte, con porcentajes que varían según la categoría."
+    extra = f" Idea del grupo: {notas.strip()}" if notas and notas.strip() else ""
+    return met + res_ + prod + extra
+
+
+def _explicar_columnas() -> None:
+    st.markdown("#### Cómo leer las tablas")
+    col = pd.DataFrame([
+        ("Horas", "Horas declaradas en tareas de servicios y de base (preparar, guiar, cocinar, ordenar). Las horas en el puesto "
+                  "de plantas no cuentan aquí: se reconocen con el % de quien produjo y de quien vendió."),
+        ("Recibe por su trabajo", "Lo que le toca de la bolsa de trabajo según el método del escenario, más lo que le corresponde "
+                                  "como productor/a o vendedor/a de plantas. No incluye reembolsos."),
+        ("Reembolso de gastos", "Plata que puso de su bolsillo y todavía no le devuelven. Se le devuelve entera; no es ganancia."),
+        ("Total a recibir", "Recibe por su trabajo + reembolso de gastos."),
+        ("Aportó ($)", "Valor en ventas de lo que ayudó a generar: el ingreso de cada línea de servicio en que trabajó, "
+                       "repartido según sus horas, más el valor de las plantas que produjo. Las tareas de base no suman. "
+                       "Quien tiene horas sin línea asignada o sin producción registrada aparece con un aporte menor al real."),
+        ("% de lo generado", "Su «Aportó» dividido por el ingreso total del proyecto (servicios más plantas)."),
+        ("Ingreso de servicios en que trabajó", "Parte del ingreso de las líneas de servicio (recorrido, snack, talleres, "
+                                                "empanadas) que corresponde a sus horas en ellas."),
+        ("Ingreso de productos que produjo", "Valor de las plantas y productos vendidos que esa persona produjo."),
+        ("Vendió ($)", "Total de plantas y productos que vendió, sin importar quién los produjo."),
+        ("Gastos que puso", "Compras o traslados que pagó de su bolsillo para la actividad."),
+        ("Para AUCCA", "Dinero que corresponde al espacio: reserva sobre los servicios más su parte de las plantas. "
+                       "Se ingresa a mano en Finanzas."),
+        ("Fondo común", "Reserva del proyecto para imprevistos; queda en custodia hasta que el grupo decida su uso."),
+        ("Sin asignar", "Dinero de plantas cuyo productor/a o vendedor/a todavía no está registrado."),
+    ], columns=["Columna", "Qué significa"])
+    st.dataframe(col, hide_index=True, use_container_width=True)
+
+
+def _resumen_ingresado(pid: str, personas: pd.DataFrame) -> None:
+    """Contexto: lo que ingresó y puso cada persona, antes de comparar escenarios."""
+    st.markdown("#### Contexto: lo que ingresó y puso cada persona")
+    if personas.empty:
+        st.info("Aún no hay personas con horas, ventas o producción registradas.")
+        return
+    gastos: dict[str, float] = {}
+    for _, f in D.cargar_proyecto("coop_costos", pid).iterrows():
+        quien = str(f["PagadoPor"]).strip()
+        if quien:
+            gastos[quien] = gastos.get(quien, 0.0) + M.num(f["Monto"])
+    v = personas[["Persona", "Horas", "Aporte en servicios ($)", "Aporte en productos ($)", "Vendió ($)",
+                  "Aporte total ($)", "Reembolso de gastos"]].copy()
+    v.insert(6, "Gastos que puso", v["Persona"].map(lambda x: round(gastos.get(x, 0.0))))
+    num_cols = [c for c in v.columns if c != "Persona"]
+    v = v[(v[num_cols] != 0).any(axis=1)]
+    tot = {c: v[c].sum() for c in num_cols}
+    v = pd.concat([v, pd.DataFrame([{"Persona": "TOTAL", **tot}])], ignore_index=True)
+    for c in num_cols:
+        v[c] = v[c].map(lambda x: f"{x:g}") if c == "Horas" else v[c].map(clp)
+    v = v.rename(columns={"Aporte en servicios ($)": "Ingreso de servicios en que trabajó",
+                          "Aporte en productos ($)": "Ingreso de productos que produjo",
+                          "Aporte total ($)": "Aportó ($)", "Reembolso de gastos": "Pendiente de devolver"})
+    st.dataframe(v, hide_index=True, use_container_width=True)
+    st.caption("Es el punto de partida, igual en todos los escenarios: lo que cada persona trabajó, generó, vendió y puso de su "
+               "bolsillo. Más abajo se ve cómo cambia lo que recibe según cada forma de repartir.")
+
+
 def _resultados_todos(pid: str, p: dict) -> None:
     """Una tabla por escenario: cuánto recibe cada persona y cuánto aportó, para comparar lado a lado."""
     esc = D.cargar("coop_parametros")
@@ -399,10 +488,14 @@ def _resultados_todos(pid: str, p: dict) -> None:
         escenarios = [("", "Parámetros base", "")]
     else:
         escenarios = [(r["ID"], r["Nombre"], r["Estado"]) for _, r in esc.iterrows()]
+    notas_esc = dict(zip(esc["ID"], esc["Notas"])) if not esc.empty else {}
     calculos = []
     for eid, nombre, estado in escenarios:
         prm = _params_de(eid)
         calculos.append((eid, nombre, estado, prm, _calcular(pid, prm)))
+
+    _resumen_ingresado(pid, calculos[0][4]["personas"])
+    _explicar_columnas()
 
     # comparación rápida: total que recibiría cada persona en cada escenario
     st.markdown("#### Resumen: cuánto recibiría cada persona según el escenario")
@@ -428,8 +521,8 @@ def _resultados_todos(pid: str, p: dict) -> None:
         pers = res["personas"]
         with st.container(border=True):
             st.markdown(f"#### {nombre}")
-            st.caption(f"{('Estado: **' + estado + '** · ') if estado else ''}método: **{M.METODOS[r['metodo']]}** · "
-                       f"espacio {prm['pct_espacio']:g}% · fondo común {prm['pct_fondo_comun']:g}%")
+            st.markdown(_describir_escenario(prm, notas_esc.get(eid, "")))
+            st.caption(f"{('Estado: **' + estado + '** · ') if estado else ''}método: **{M.METODOS[r['metodo']]}**")
             if pers.empty:
                 st.info("Sin personas con horas, ventas o producción.")
             else:
@@ -455,11 +548,7 @@ def _resultados_todos(pid: str, p: dict) -> None:
         st.download_button("⬇️ Descargar todos los escenarios (CSV)",
                            pd.DataFrame(largo).to_csv(index=False).encode("utf-8-sig"),
                            file_name=f"escenarios_{p['Nombre']}.csv", mime="text/csv")
-    st.caption("«Recibe por su trabajo» suma la parte de la bolsa de trabajo y lo que le toca como productor/a o vendedor/a. "
-               "«Aportó» es el valor de lo que generó con su trabajo: solo cuenta las horas asignadas a una línea de servicio y los "
-               "productos que produjo, así que quien tiene horas sin línea o sin producción registrada aparece con aporte menor "
-               "al real hasta completar esos datos. Para ver las cascadas y las líneas de un escenario, "
-               "elige «Un escenario en detalle».")
+    st.caption("Para ver las cascadas del dinero y las líneas de un escenario, elige «Un escenario en detalle».")
 
 
 def _sec_resultados(pid: str) -> None:
