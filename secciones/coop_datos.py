@@ -9,6 +9,8 @@ NUNCA lee ni escribe la hoja «finanzas» de AUCCA.
 from __future__ import annotations
 
 import json
+import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -67,27 +69,66 @@ def _normalizar(tabla: str, df: pd.DataFrame) -> pd.DataFrame:
     return df[cols].fillna("").astype(str)
 
 
-def _ws(tabla: str):
-    from data.google import _get_spreadsheet, with_retry
+# Google limita las lecturas (60 por minuto para toda la app). Por eso todas las hojas coop_* se leen
+# juntas con UNA sola llamada y se guardan en memoria; al escribir, la copia en memoria se actualiza
+# sin volver a leer.
+_LOCK = threading.RLock()
+_CACHE: dict = {"t": 0.0, "datos": {}, "ws": {}}
+_TTL = 90          # segundos que se reutiliza lo leído
+_TTL_FRESCO = 5    # al pedir «fresco» antes de escribir, se acepta lo leído hace menos de esto
+
+
+def _reintentar(fn):
+    """Reintenta ante cuota excedida (429) o fallas del servidor, esperando lo suficiente
+    para que la cuota por minuto se libere."""
+    from gspread.exceptions import APIError
+    esperas = (5, 15, 30)
+    for k in range(len(esperas) + 1):
+        try:
+            return fn()
+        except APIError as e:
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            if status in (429, 500, 502, 503) and k < len(esperas):
+                time.sleep(esperas[k])
+                continue
+            raise
+
+
+def _refrescar() -> None:
+    """Lee todas las hojas coop_* de una vez (2 llamadas), creando las que falten."""
+    from data.google import _get_spreadsheet
     sh = _get_spreadsheet()
-    try:
-        return sh.worksheet(tabla)
-    except Exception:
-        ws = with_retry(lambda: sh.add_worksheet(title=tabla, rows=200, cols=len(TABLAS[tabla]) + 2))
-        with_retry(lambda: ws.update(values=[TABLAS[tabla]], range_name="A1", value_input_option="RAW"))
-        return ws
+    ws = {w.title: w for w in _reintentar(lambda: sh.worksheets())}
+    for t in TABLAS:
+        if t not in ws:
+            w = _reintentar(lambda: sh.add_worksheet(title=t, rows=200, cols=len(TABLAS[t]) + 2))
+            _reintentar(lambda: w.update(values=[TABLAS[t]], range_name="A1", value_input_option="RAW"))
+            ws[t] = w
+    resp = _reintentar(lambda: sh.values_batch_get(list(TABLAS)))
+    datos = {}
+    for t, rango in zip(TABLAS, resp.get("valueRanges", [])):
+        vals = rango.get("values", [])
+        if not vals:
+            datos[t] = _vacio(t)
+            continue
+        cab = [h.strip() for h in vals[0]]
+        filas = [r + [""] * (len(cab) - len(r)) for r in vals[1:] if any(str(c).strip() for c in r)]
+        datos[t] = _normalizar(t, pd.DataFrame(filas, columns=cab))
+    _CACHE.update(t=time.time(), datos=datos, ws=ws)
 
 
-@st.cache_data(ttl=20, show_spinner=False)
-def _leer_sheets(tabla: str) -> pd.DataFrame:
-    from data.google import with_retry
-    ws = _ws(tabla)
-    vals = with_retry(lambda: ws.get_all_values())
-    if not vals:
-        return _vacio(tabla)
-    cab = [h.strip() for h in vals[0]]
-    filas = [r + [""] * (len(cab) - len(r)) for r in vals[1:] if any(str(c).strip() for c in r)]
-    return _normalizar(tabla, pd.DataFrame(filas, columns=cab))
+def _leer_sheets(tabla: str, fresco: bool = False) -> pd.DataFrame:
+    with _LOCK:
+        edad = time.time() - _CACHE["t"]
+        if not _CACHE["datos"] or edad > (_TTL_FRESCO if fresco else _TTL):
+            try:
+                _refrescar()
+            except Exception:
+                if not _CACHE["datos"]:
+                    raise
+                # sin cuota: se sigue con lo último leído y se reintenta en 15 s
+                _CACHE["t"] = time.time() - _TTL + 15
+        return _CACHE["datos"][tabla].copy()
 
 
 def _leer_local(tabla: str) -> pd.DataFrame:
@@ -99,9 +140,7 @@ def _leer_local(tabla: str) -> pd.DataFrame:
 
 def cargar(tabla: str, fresco: bool = False) -> pd.DataFrame:
     if usa_sheets():
-        if fresco:
-            _leer_sheets.clear(tabla)
-        return _leer_sheets(tabla).copy()
+        return _leer_sheets(tabla, fresco)
     return _leer_local(tabla)
 
 
@@ -114,12 +153,14 @@ def cargar_proyecto(tabla: str, proyecto_id: str) -> pd.DataFrame:
 def _escribir_todo(tabla: str, df: pd.DataFrame) -> None:
     df = _normalizar(tabla, df.copy())
     if usa_sheets():
-        from data.google import with_retry
-        ws = _ws(tabla)
-        valores = [TABLAS[tabla]] + df.values.tolist()
-        with_retry(lambda: ws.clear())
-        with_retry(lambda: ws.update(values=valores, range_name="A1", value_input_option="RAW"))
-        _leer_sheets.clear(tabla)
+        with _LOCK:
+            if tabla not in _CACHE["ws"]:
+                _refrescar()
+            ws = _CACHE["ws"][tabla]
+            valores = [TABLAS[tabla]] + df.values.tolist()
+            _reintentar(lambda: ws.clear())
+            _reintentar(lambda: ws.update(values=valores, range_name="A1", value_input_option="RAW"))
+            _CACHE["datos"][tabla] = df.reset_index(drop=True)
     else:
         _LOCAL.mkdir(parents=True, exist_ok=True)
         (_LOCAL / f"{tabla}.json").write_text(
@@ -220,9 +261,21 @@ def migrar_a_datos_reales() -> bool:
     proy = cargar("coop_proyectos", fresco=True)
     proy.loc[proy["ID"] == PID, "Descripcion"] = nuevos["coop_proyectos"][0]["Descripcion"]
     _escribir_todo("coop_proyectos", proy)
-    gob = cargar("coop_gobernanza", fresco=True)
-    faltan = _normalizar("coop_gobernanza", pd.DataFrame(nuevos["coop_gobernanza"]))
-    faltan = faltan[~faltan["ID"].isin(gob["ID"])]
-    if not faltan.empty:
-        _escribir_todo("coop_gobernanza", pd.concat([gob, faltan], ignore_index=True))
+    completar_gobernanza_inicial()
+    return True
+
+
+def completar_gobernanza_inicial() -> bool:
+    """Agrega las dos tensiones/propuestas surgidas de las respuestas del 24 nov (semanero y jornadas
+    regulares) si el proyecto ya tiene los datos reales y todavía no están."""
+    from secciones.coop_inicial import PID, datos_proyecto_inicial
+    reg = cargar_proyecto("coop_registro", PID)
+    if reg.empty or not reg["ID"].str.startswith("rh").any():
+        return False
+    gob = cargar("coop_gobernanza")
+    if gob["ID"].isin(["g9", "g10"]).any():
+        return False
+    nuevas = _normalizar("coop_gobernanza", pd.DataFrame(datos_proyecto_inicial()["coop_gobernanza"]))
+    nuevas = nuevas[nuevas["ID"].isin(["g9", "g10"])]
+    _escribir_todo("coop_gobernanza", pd.concat([gob, nuevas], ignore_index=True))
     return True

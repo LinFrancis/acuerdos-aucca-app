@@ -153,3 +153,49 @@ def test_migracion_de_estimaciones_a_datos_reales(tmp_path, monkeypatch):
     # y no pisa datos que alguien ya editó
     CD._escribir_todo("coop_registro", pd.DataFrame(vieja[:1] + [dict(vieja[1], Origen="Real")]))
     assert CD.migrar_a_datos_reales() is False
+
+
+class _HojaFalsa:
+    def __init__(self, titulo, filas):
+        self.title, self.filas = titulo, filas
+
+    def clear(self):
+        self.filas = []
+
+    def update(self, values, range_name="A1", value_input_option="RAW"):
+        self.filas = values
+
+
+class _LibroFalso:
+    """Cuenta las llamadas de lectura para comprobar que no se agota la cuota de Google."""
+    def __init__(self):
+        self.hojas = {}
+        self.lecturas = 0
+
+    def worksheets(self):
+        self.lecturas += 1
+        return list(self.hojas.values())
+
+    def add_worksheet(self, title, rows, cols):
+        self.hojas[title] = _HojaFalsa(title, [])
+        return self.hojas[title]
+
+    def values_batch_get(self, rangos):
+        self.lecturas += 1
+        return {"valueRanges": [{"values": self.hojas[r].filas} for r in rangos]}
+
+
+def test_sheets_lee_todo_junto_y_no_relee_al_escribir(monkeypatch):
+    from secciones import coop_datos as CD
+    libro = _LibroFalso()
+    monkeypatch.setattr(CD, "usa_sheets", lambda: True)
+    monkeypatch.setattr("data.google._get_spreadsheet", lambda: libro, raising=False)
+    CD._CACHE.update(t=0.0, datos={}, ws={})
+    for t in CD.TABLAS:
+        CD.cargar(t)
+    assert libro.lecturas == 2                     # 1 listado de hojas + 1 lectura por lote, no una por tabla
+    CD._escribir_todo("coop_personas", pd.DataFrame([{"Persona": "Ana", "ValorHora": "5000"}]))
+    assert CD.cargar("coop_personas", fresco=True)["Persona"].tolist() == ["Ana"]
+    assert libro.hojas["coop_personas"].filas[1][0] == "Ana"
+    assert libro.lecturas == 2                     # escribir y volver a leer no gasta cuota
+    CD._CACHE.update(t=0.0, datos={}, ws={})

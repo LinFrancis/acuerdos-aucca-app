@@ -868,6 +868,7 @@ def render() -> None:
         # primera vez: queda registrado el primer proyecto de la cooperativa (la visita del 13 de noviembre)
         D.sembrar_proyecto_inicial()
         st.rerun()
+    D.completar_gobernanza_inicial()
     if D.migrar_a_datos_reales():
         # instalaciones que ya tenían las estimaciones de la primera carga: pasan a los datos declarados
         st.rerun()
