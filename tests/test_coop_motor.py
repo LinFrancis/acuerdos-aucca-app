@@ -218,3 +218,16 @@ def test_restaurar_proyecto_si_no_esta(tmp_path, monkeypatch):
     CD._escribir_todo("coop_proyectos", pd.DataFrame(columns=CD.TABLAS["coop_proyectos"]))
     CD.restaurar_proyecto_inicial()
     assert len(CD.cargar_proyecto("coop_registro", PID)) == len(D["coop_registro"])
+
+
+def test_pendientes_con_tablas_vacias_desde_sheets(monkeypatch):
+    """Con datos leídos de Sheets, una tabla vacía (p. ej. producción) no debe romper el conteo."""
+    from secciones import coop_datos as CD, cooperativa as C
+    libro = _LibroFalso()
+    monkeypatch.setattr(CD, "usa_sheets", lambda: True)
+    monkeypatch.setattr("data.google._get_spreadsheet", lambda: libro, raising=False)
+    CD._CACHE.update(t=0.0, datos={}, ws={})
+    CD.restaurar_proyecto_inicial()
+    pend = C._pendientes(PID)
+    assert pend["producción"] == 0 and pend["horas"] == 2 and pend["ventas"] == 2
+    CD._CACHE.update(t=0.0, datos={}, ws={})

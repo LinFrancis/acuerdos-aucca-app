@@ -107,12 +107,13 @@ def _pendientes(pid: str) -> dict:
     """Cuenta los datos que aún son estimaciones («por confirmar») en el proyecto."""
     def n(tabla):
         df = D.cargar_proyecto(tabla, pid)
-        return int(df["PorConfirmar"].map(_bool).sum()) if "PorConfirmar" in df else 0
+        return sum(1 for v in df["PorConfirmar"] if _bool(v)) if "PorConfirmar" in df else 0
     reg = D.cargar_proyecto("coop_registro", pid)
     per = D.cargar("coop_personas")
-    return {"horas": int(reg["Origen"].str.lower().str.startswith(("sim", "estim")).sum()),
+    # se cuenta con Python y no con .sum() de pandas: en una tabla vacía .sum() devuelve texto vacío
+    return {"horas": sum(1 for v in reg["Origen"] if str(v).lower().startswith(("sim", "estim"))),
             "ventas": n("coop_ventas"), "producción": n("coop_produccion"), "costos": n("coop_costos"),
-            "tarifas de personas": int(per["PorConfirmar"].map(_bool).sum())}
+            "tarifas de personas": sum(1 for v in per["PorConfirmar"] if _bool(v))}
 
 
 def _aviso_por_confirmar(pid: str) -> None:
