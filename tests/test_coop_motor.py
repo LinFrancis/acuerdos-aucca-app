@@ -231,3 +231,24 @@ def test_pendientes_con_tablas_vacias_desde_sheets(monkeypatch):
     pend = C._pendientes(PID)
     assert pend["producción"] == 0 and pend["horas"] == 2 and pend["ventas"] == 2
     CD._CACHE.update(t=0.0, datos={}, ws={})
+
+
+def test_observaciones_explican_los_datos():
+    from secciones import coop_observaciones as O
+    res = correr(metodo="D")
+    pers = res["personas"]
+    ctx = " ".join(O.obs_contexto(pers, res["resumen"], pd.DataFrame(D["coop_registro"]), pd.DataFrame(D["coop_costos"])))
+    assert "44,48" in ctx and "Todos ya fueron devueltos" in ctx and "Ninguno tiene boleta" in ctx
+    assert "$28.500" in ctx
+    assert DIEGO in ctx and CAMILU in ctx          # horas sin línea: aporte en $0
+    d = " ".join(O.obs_escenario(M.params_completos({"metodo": "D"}), res))
+    assert "parte compartida" in d and "$14.250" in d
+    e = " ".join(O.obs_escenario(M.params_completos({"metodo": "E"}), correr(metodo="E")))
+    assert "mismo" in e or "Ignora las horas" in e
+
+
+def test_observaciones_comparativo():
+    from secciones import coop_observaciones as O
+    tabla = pd.DataFrame({"A": {"x": 100, "y": 50}, "B": {"x": 60, "y": 90}})
+    txt = " ".join(O.obs_comparativo(tabla, [150, 150]))
+    assert "misma plata" in txt and "más cambia" in txt

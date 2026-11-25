@@ -36,6 +36,7 @@ st = _ST()
 
 from secciones import coop_datos as D
 from secciones import coop_motor as M
+from secciones import coop_observaciones as OBS
 from secciones.finanzas_aucca import AUCCANES
 
 ESTADOS = ["Diseño", "En ejecución", "En cierre", "Cerrado", "Anulado"]
@@ -453,7 +454,13 @@ def _explicar_columnas() -> None:
     st.dataframe(col, hide_index=True, use_container_width=True)
 
 
-def _resumen_ingresado(pid: str, personas: pd.DataFrame) -> None:
+def _observaciones(lista: list[str]) -> None:
+    """Notas para entender la tabla de arriba."""
+    if lista:
+        st.markdown("**Observaciones para entender los datos**\n\n" + "\n".join(f"- {t}" for t in lista))
+
+
+def _resumen_ingresado(pid: str, personas: pd.DataFrame, r: dict) -> None:
     """Contexto: lo que ingresó y puso cada persona, antes de comparar escenarios."""
     st.markdown("#### Contexto: lo que ingresó y puso cada persona")
     if personas.empty:
@@ -479,6 +486,8 @@ def _resumen_ingresado(pid: str, personas: pd.DataFrame) -> None:
     st.dataframe(v, hide_index=True, use_container_width=True)
     st.caption("Es el punto de partida, igual en todos los escenarios: lo que cada persona trabajó, generó, vendió y puso de su "
                "bolsillo. Más abajo se ve cómo cambia lo que recibe según cada forma de repartir.")
+    _observaciones(OBS.obs_contexto(personas, r, D.cargar_proyecto("coop_registro", pid),
+                                    D.cargar_proyecto("coop_costos", pid)))
 
 
 def _resultados_todos(pid: str, p: dict) -> None:
@@ -494,7 +503,7 @@ def _resultados_todos(pid: str, p: dict) -> None:
         prm = _params_de(eid)
         calculos.append((eid, nombre, estado, prm, _calcular(pid, prm)))
 
-    _resumen_ingresado(pid, calculos[0][4]["personas"])
+    _resumen_ingresado(pid, calculos[0][4]["personas"], calculos[0][4]["resumen"])
     _explicar_columnas()
 
     # comparación rápida: total que recibiría cada persona en cada escenario
@@ -506,12 +515,14 @@ def _resultados_todos(pid: str, p: dict) -> None:
     if base:
         comp = pd.DataFrame(base).T.fillna(0)
         comp = comp.loc[(comp != 0).any(axis=1)]
+        comp_num = comp.copy()
         comp.loc["TOTAL"] = comp.sum()
         comp = comp.reset_index().rename(columns={"index": "Persona"})
         for c in comp.columns[1:]:
             comp[c] = comp[c].map(clp)
         st.dataframe(comp, hide_index=True, use_container_width=True)
         st.caption("Incluye reembolsos de gastos. Abajo está el detalle de cada escenario.")
+        _observaciones(OBS.obs_comparativo(comp_num, [c[4]["resumen"]["pagos_trabajo"] for c in calculos]))
     else:
         st.info("Aún no hay personas con horas, ventas o producción registradas.")
 
@@ -541,6 +552,10 @@ def _resultados_todos(pid: str, p: dict) -> None:
                 v = v.rename(columns={"Pago por trabajo": "Recibe por su trabajo", "Aporte total ($)": "Aportó ($)",
                                       "% del ingreso generado": "% de lo generado"})
                 st.dataframe(v, hide_index=True, use_container_width=True)
+            est = D.cargar("coop_personas")
+            est = est[est["PorConfirmar"].map(_bool)]["Persona"].tolist()
+            _observaciones(OBS.obs_escenario(prm, res, [x for x in est if x in pers["Persona"].tolist()
+                                                         and pers.set_index("Persona").loc[x, "Horas"] > 0]))
             st.caption(f"Para AUCCA: **{clp(r['aporte_a_aucca'])}** · fondo común: **{clp(r['fondo_comun'])}**"
                        + (f" · sin asignar: **{clp(r['sin_asignar'])}**" if r["sin_asignar"] else "")
                        + ("" if res["balance_ok"] else " · ⚠️ la cuadratura no cierra"))
