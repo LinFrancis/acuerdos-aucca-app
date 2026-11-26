@@ -271,6 +271,8 @@ def render():
 
     active_tab = st.radio("Sección del Evento", tab_options, horizontal=True,
                           label_visibility="collapsed", key=tab_key)
+    from secciones.nav_movil import selector_movil
+    selector_movil(tab_options, tab_key, "evt", prefijo="Sección:", columnas=1)
 
     # ==========================================
     # TAB 0: Información General

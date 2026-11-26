@@ -426,6 +426,8 @@ def render():
         key="tab_selector"
     )
     st.session_state["tab_idx"] = TAB_LABELS.index(tab_label)
+    from secciones.nav_movil import selector_movil
+    selector_movil(TAB_LABELS, "tab_selector", "semanerx", prefijo="Sección:", columnas=1)
 
 
     # ------------------------

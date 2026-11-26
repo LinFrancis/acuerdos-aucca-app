@@ -215,6 +215,7 @@ hr { border-color: #E6D9FF !important; }
 }
 
 /* ===== Celular (solo pantallas angostas; el escritorio no cambia) ===== */
+@media (min-width: 641px) { [class*="st-key-mm_"] { display: none !important; } }
 @media (max-width: 640px) {
   .block-container { padding: 1rem 0.75rem 3rem !important; }
   .aucca-banner { padding: 0.75rem 1rem; gap: 0.75rem; margin: 0.25rem 0 1rem; border-radius: 14px; }
@@ -227,38 +228,24 @@ hr { border-color: #E6D9FF !important; }
   [data-testid="stMetricValue"] { font-size: 1.3rem !important; }
   [data-testid="stMetricLabel"] p { font-size: 0.8rem !important; }
 
-  /* Barras de navegación: una sola fila que se desliza con el dedo */
-  [data-testid="stButtonGroup"] > div,
-  .st-key-coop_sec [role="radiogroup"],
-  [class*="st-key-tab_evt_"] [role="radiogroup"] {
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 6px;
+  /* Navegación: en celular se usa el selector grande (botón + cuadrícula) y se ocultan las filas de pestañas */
+  .st-key-nav_pills, .st-key-nav_radio, .st-key-coop_sec, .st-key-coop_doc, .st-key-tab_selector,
+  [class*="st-key-tab_evt_"] { display: none !important; }
+  [class*="st-key-mm_"] { margin: 0 0 0.75rem; }
+  [class*="st-key-mm_"] button {
+    min-height: 3.1rem !important; border-radius: 14px !important; font-size: 0.95rem !important;
+    line-height: 1.2 !important; padding: 0.5rem 0.75rem !important;
   }
-  [data-testid="stButtonGroup"] > div::-webkit-scrollbar,
-  .st-key-coop_sec [role="radiogroup"]::-webkit-scrollbar,
-  [class*="st-key-tab_evt_"] [role="radiogroup"]::-webkit-scrollbar { display: none; }
-  [data-testid="stButtonGroup"] > div > *,
-  .st-key-coop_sec [role="radiogroup"] > label,
-  [class*="st-key-tab_evt_"] [role="radiogroup"] > label {
-    flex: 0 0 auto !important;
-    white-space: nowrap !important;
+  [class*="st-key-mm_"] button p { white-space: normal !important; text-align: left; margin: 0; }
+  [class*="st-key-mm_"][class*="_btn"] button {
+    background: #FFFFFF !important; border: 2px solid #B497E7 !important; color: #7B4F9E !important;
+    box-shadow: 0 2px 8px rgba(123,79,158,0.12) !important; justify-content: flex-start !important;
   }
-  /* Las pestañas de la barra principal se ven como botones fáciles de tocar */
-  .st-key-coop_sec [role="radiogroup"] > label,
-  [class*="st-key-tab_evt_"] [role="radiogroup"] > label {
-    border: 1px solid #CDB4FF; border-radius: 999px; padding: 4px 12px; background: #FFFFFF; margin-right: 6px;
+  [class*="st-key-mm_"][class*="_t"] button { min-height: 3.4rem !important; }
+  [class*="st-key-mm_"] button[kind="primary"], [class*="st-key-mm_"] [data-testid="stBaseButton-primary"] {
+    background: #B497E7 !important; border: 2px solid #B497E7 !important; color: #FFFFFF !important;
   }
-  .st-key-coop_sec [role="radiogroup"] > label:has(input:checked),
-  [class*="st-key-tab_evt_"] [role="radiogroup"] > label:has(input:checked) {
-    background: #B497E7; border-color: #B497E7;
-  }
-  .st-key-coop_sec [role="radiogroup"] > label:has(input:checked) p,
-  [class*="st-key-tab_evt_"] [role="radiogroup"] > label:has(input:checked) p { color: #FFFFFF !important; }
-  .st-key-coop_sec [data-testid="stRadioOption"] > div > div > div:first-child:not([data-testid="stMarkdownContainer"]),
-  [class*="st-key-tab_evt_"] [data-testid="stRadioOption"] > div > div > div:first-child:not([data-testid="stMarkdownContainer"]) { display: none !important; }
+  [class*="st-key-mm_"] button[kind="primary"] p, [class*="st-key-mm_"] [data-testid="stBaseButton-primary"] p { color: #FFFFFF !important; }
 
   /* Columnas: dos por fila en vez de una larguísima pila */
   [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.5rem !important; }
@@ -346,21 +333,42 @@ section_q = _get_query_section()
 #   cualquier parte de la app. Este selector evita ese costo: solo se ejecuta
 #   el render() de la sección elegida.
 # ----------------------------
-if "active_section" not in st.session_state:
+if "active_section" not in st.session_state or st.session_state["active_section"] not in SLUGS:
     st.session_state["active_section"] = section_q if section_q in SLUGS else SLUGS[0]
 
-default_label = LABEL_BY_SLUG.get(st.session_state["active_section"], LABELS[0])
 
+def _ir_a(slug):
+    """Cambia de módulo (desde el selector de celular o desde las pills)."""
+    st.session_state["active_section"] = slug
+    st.session_state["nav_pills"] = LABEL_BY_SLUG[slug]
+    st.session_state["nav_radio"] = LABEL_BY_SLUG[slug]
+
+
+def _nav_cambio(clave):
+    elegido = st.session_state.get(clave)
+    if elegido in SLUG_BY_LABEL:
+        st.session_state["active_section"] = SLUG_BY_LABEL[elegido]
+    else:  # si se deselecciona la pill, se queda en el módulo actual
+        st.session_state[clave] = LABEL_BY_SLUG[st.session_state["active_section"]]
+
+
+default_label = LABEL_BY_SLUG[st.session_state["active_section"]]
+st.session_state["nav_pills"] = default_label
+st.session_state["nav_radio"] = default_label
 try:
-    selected_label = st.pills("Navegación", LABELS, default=default_label, key="nav_pills")
-    if not selected_label:
-        selected_label = default_label
+    st.pills("Navegación", LABELS, key="nav_pills", on_change=_nav_cambio, args=("nav_pills",))
 except AttributeError:
-    idx_default = LABELS.index(default_label) if default_label in LABELS else 0
-    selected_label = st.radio("Navegación", LABELS, index=idx_default, horizontal=True, key="nav_radio")
+    st.radio("Navegación", LABELS, horizontal=True, key="nav_radio", on_change=_nav_cambio, args=("nav_radio",))
 
-selected_slug = SLUG_BY_LABEL.get(selected_label, SLUGS[0])
-st.session_state["active_section"] = selected_slug
+# Celular: botón con el módulo actual que abre una cuadrícula de botones grandes
+from secciones.nav_movil import selector_movil
+ICONOS_MODULOS = {"bienvenida": "🏠", "checklist": "✅", "finanzas": "💰", "links": "🔗",
+                  "acuerdos": "📜", "cooperativa": "🤝", "eventos": "🎪"}
+selector_movil([(sec["slug"], sec["label"]) for sec in SECTIONS], "active_section", "nav", prefijo="☰",
+               columnas=2, al_elegir=_ir_a, iconos=ICONOS_MODULOS)
+
+selected_slug = st.session_state["active_section"]
+selected_label = LABEL_BY_SLUG[selected_slug]
 
 try:
     st.query_params["section"] = selected_slug
@@ -441,24 +449,6 @@ def _safe_render(section_slug: str):
         # Panel de diagnóstico: no rompe toda la app
         st.error("No se pudo renderizar esta sección. Revisa el detalle abajo.")
         st.exception(e)
-
-# ----------------------------
-# Celular: dejar visible la pestaña activa en las barras que se deslizan
-# ----------------------------
-try:
-    import streamlit.components.v1 as _components
-    _components.html(
-        """<script>
-        const d = window.parent.document;
-        const ir = () => d.querySelectorAll(
-          '[data-testid="stButtonGroup"] button[aria-checked="true"],'
-          + '.st-key-coop_sec label:has(input:checked),'
-          + '[class*="st-key-tab_evt_"] label:has(input:checked)'
-        ).forEach(e => e.scrollIntoView({inline: "center", block: "nearest"}));
-        setTimeout(ir, 200); setTimeout(ir, 900);
-        </script>""", height=0)
-except Exception:
-    pass
 
 # ----------------------------
 # Render de la sección activa (única)

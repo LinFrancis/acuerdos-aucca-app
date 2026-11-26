@@ -37,6 +37,7 @@ st = _ST()
 from secciones import coop_datos as D
 from secciones import coop_motor as M
 from secciones import coop_observaciones as OBS
+from secciones.nav_movil import selector_movil
 from secciones.finanzas_aucca import AUCCANES
 
 ESTADOS = ["Diseño", "En ejecución", "En cierre", "Cerrado", "Anulado"]
@@ -1037,6 +1038,7 @@ def _sec_manual() -> None:
                 "Reglamento interno (borrador)": "reglamento_interno_borrador.md",
                 "Notas legales y tributarias": "notas_legales_tributarias.md"}
     sel = st.radio("Documento", list(opciones), horizontal=True, key="coop_doc")
+    selector_movil(list(opciones), "coop_doc", "doc", prefijo="Documento:", columnas=1)
     f = DOCS / opciones[sel]
     if f.exists():
         st.markdown(f.read_text(encoding="utf-8"))
@@ -1065,7 +1067,10 @@ def render() -> None:
     proy = D.cargar("coop_proyectos")
     secciones = ["Proyectos", "Resumen", "Registro", "Resultados", "Simulador", "Parámetros", "Planificar",
                  "Pagos y fondos", "Personas", "Círculos", "Manual"]
+    if st.session_state.get("coop_sec") not in secciones:
+        st.session_state["coop_sec"] = secciones[0]
     sec = st.radio("Sección", secciones, horizontal=True, label_visibility="collapsed", key="coop_sec")
+    selector_movil(secciones, "coop_sec", "coop", prefijo="Sección:", columnas=2)
     if sec == "Proyectos" or proy.empty:
         st.markdown("---")
         _sec_proyectos()
